@@ -17,10 +17,12 @@ export default function SingMode() {
   const [currentLine, setCurrentLine] = useState(0)
   const [track, setTrack] = useState(searchParams.get('track') || 'acoustic')
   const [audioError, setAudioError] = useState(false)
+  const [showControls, setShowControls] = useState(true)
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
   const scrollPosRef = useRef(0)
   const audioRef = useRef(null)
+  const hideTimerRef = useRef(null)
 
   useEffect(() => {
     async function load() {
@@ -85,6 +87,25 @@ export default function SingMode() {
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   }, [isPlaying, bpm, multiplier])
 
+  // Auto-hide controls when playing, show when paused or tapped
+  useEffect(() => {
+    if (isPlaying) {
+      hideTimerRef.current = setTimeout(() => setShowControls(false), 2000)
+    } else {
+      clearTimeout(hideTimerRef.current)
+      setShowControls(true)
+    }
+    return () => clearTimeout(hideTimerRef.current)
+  }, [isPlaying])
+
+  function handleScreenTap() {
+    setShowControls(true)
+    clearTimeout(hideTimerRef.current)
+    if (isPlaying) {
+      hideTimerRef.current = setTimeout(() => setShowControls(false), 2000)
+    }
+  }
+
   function handleRestart() {
     scrollPosRef.current = 0
     setCurrentLine(0)
@@ -117,7 +138,7 @@ export default function SingMode() {
   }
 
   return (
-    <div style={{ background: '#070707', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div onClick={handleScreenTap} style={{ background: '#070707', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Hidden audio element — plays instrumental in sync with scroll */}
       {hasAudio && (
         <audio key={activeAudioUrl} ref={audioRef} src={activeAudioUrl}
@@ -125,7 +146,7 @@ export default function SingMode() {
       )}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 20px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
         <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <X size={20} />
         </button>
@@ -189,7 +210,7 @@ export default function SingMode() {
       </div>
 
       {/* Control dock */}
-      <div style={{ background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', padding: '16px 20px 36px', flexShrink: 0, zIndex: 10 }}>
+      <div style={{ background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', padding: '16px 20px 36px', flexShrink: 0, zIndex: 10, opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
         {/* Track selector — only when both tracks available */}
         {hasBoth && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
