@@ -1,0 +1,10 @@
+export const MOCK_SONGS = [
+  { id: '1', title: 'Isa Lei', artist: 'Traditional', category: 'Farewell', province: 'Viti Levu', source: 'Songbook Vol.1', bpm: 72, free: true, verified: true, lyrics: 'Isa lei na noqu rarawa\nNi ko sa na yaco sara\nE na mataka ni dua na sigavou\nKo na lako sega ni lailai\n\n[Chorus]\nIsa isa vulavula ca na lomaqu\nO mu na cegu rarawa tiko\nE na yanuyanu kece na gauna\nNi ko sa lako tani\n\nIsa lei na noqu rarawa\nMo ni saqata tiko yani\nE na mataka ni dua na sigavou\nKo na lako sega ni lailai' },
+  { id: '2', title: 'Bula Mada', artist: 'Semi Kubunavanua', category: 'Welcome', province: 'Tailevu', source: 'Radio Fiji', bpm: 90, free: true, verified: true, lyrics: 'Bula mada na nodatou veirogorogo\nKa dau rogoca na noda kenai balebale\n\nQai sega ni dua e sega ni kila\nNa nodra turaga na noda lewenivanua' },
+  { id: '3', title: 'Kaunitoni', artist: 'Traditional', category: 'Historical', province: 'Ra', source: 'Archive', bpm: 80, free: false, verified: true, lyrics: 'O Kaunitoni na waga ni bete...' },
+  { id: '4', title: 'Noqu Vale', artist: 'Ratu Osea', category: 'Love', province: 'Kadavu', source: 'Live recording', bpm: 68, free: false, verified: false, lyrics: 'Noqu vale e taukeni...' },
+  { id: '5', title: 'Turaga ni Lotu', artist: 'Traditional', category: 'Religious', province: 'Ba', source: 'Hymnbook', bpm: 60, free: false, verified: true, lyrics: 'Au sa dusimaka na Kalou...' },
+  { id: '6', title: 'Vulagi Lomani', artist: 'Mosese Soko', category: 'Welcome', province: 'Namosi', source: 'Songbook Vol.2', bpm: 84, free: false, verified: false, lyrics: 'Vulagi lomani mo bula...' },
+  { id: '7', title: 'Ai Tukutuku Raraba', artist: 'Traditional', category: 'Story', province: 'Cakaudrove', source: 'Archive', bpm: 76, free: false, verified: true, lyrics: 'Au nanuma tiko na gauna makawa...' },
+  { id: '8', title: 'Cabe Cake', artist: 'Traditional', category: 'Celebration', province: 'Lau', source: 'Oral tradition', bpm: 100, free: false, verified: false, lyrics: 'Cabe cake o dina...' },
+]

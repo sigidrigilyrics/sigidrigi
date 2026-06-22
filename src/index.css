@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg: #0A0A0A;
+  --bg1: #111111;
+  --bg2: #1A1A1A;
+  --bg3: #222222;
+  --accent: #00E5A0;
+  --accent-dark: #00B87A;
+  --gold: #FFB800;
+  --danger: #FF6B6B;
+  --text: #FFFFFF;
+  --text2: rgba(255,255,255,0.55);
+  --text3: rgba(255,255,255,0.30);
+  --border: rgba(255,255,255,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-playfair { font-family: 'Playfair Display', serif; }
+
+.tapa {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 0, transparent 50%),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 0, transparent 50%);
+  background-size: 12px 12px;
+}
+
+.tapa-accent {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(0,229,160,0.06) 0, rgba(0,229,160,0.06) 1px, transparent 0, transparent 50%),
+    repeating-linear-gradient(-45deg, rgba(0,229,160,0.06) 0, rgba(0,229,160,0.06) 1px, transparent 0, transparent 50%);
+  background-size: 12px 12px;
+}
+
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar { animation: eq-bar 1s ease-in-out infinite; transform-origin: bottom; }
+.eq-bar:nth-child(1) { animation-delay: 0s; }
+.eq-bar:nth-child(2) { animation-delay: 0.15s; }
+.eq-bar:nth-child(3) { animation-delay: 0.3s; }
+.eq-bar:nth-child(4) { animation-delay: 0.45s; }
+.eq-bar:nth-child(5) { animation-delay: 0.6s; }
+
+@keyframes scan {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+.scan-line { animation: scan 2s linear infinite; }
+
+input[type=range] {
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg3);
+  outline: none;
+  width: 100%;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
