@@ -5,6 +5,7 @@ import SingMode from './pages/SingMode'
 import AZIndex from './pages/AZIndex'
 import Upload from './pages/Upload'
 import Admin from './pages/Admin'
+import Artists from './pages/Artists'
 import BottomTabBar from './components/BottomTabBar'
 
 function Layout() {
@@ -19,6 +20,7 @@ function Layout() {
         <Route path="/index" element={<AZIndex />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/artists" element={<Artists />} />
       </Routes>
       {!hideNav && <BottomTabBar />}
     </div>

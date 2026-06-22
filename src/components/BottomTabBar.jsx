@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Search, User } from 'lucide-react'
+import { Home, Search, User, Mic2 } from 'lucide-react'
 
 export default function BottomTabBar() {
   const nav = useNavigate()
@@ -8,6 +8,7 @@ export default function BottomTabBar() {
   const tabs = [
     { label: 'Home', icon: Home, path: '/' },
     { label: 'Search', icon: Search, path: '/?search=1' },
+    { label: 'Artists', icon: Mic2, path: '/artists' },
     { label: 'Index', icon: null, path: '/index' },
     { label: 'Account', icon: User, path: '/account' },
   ]
