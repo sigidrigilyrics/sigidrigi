@@ -199,16 +199,22 @@ export default function Song() {
         </div>
       )}
 
-      {/* Reference link */}
-      {song.reference_url && (
-        <div style={{ margin: '0 20px 20px' }}>
-          <a href={song.reference_url} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', background: 'rgba(255,0,0,0.1)', border: '1.5px solid rgba(255,0,0,0.4)', borderRadius: 14, color: '#ff4444', fontWeight: 700, fontSize: 14, padding: '13px', textDecoration: 'none' }}>
-            <ExternalLink size={18} />
-            Listen to reference
-          </a>
-        </div>
-      )}
+      {/* Reference link — specific video if set, else a YouTube search for this song */}
+      {(() => {
+        const hasRef = !!song.reference_url
+        const href = hasRef
+          ? song.reference_url
+          : `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.title} ${song.artist || ''} fijian`)}`
+        return (
+          <div style={{ margin: '0 20px 20px' }}>
+            <a href={href} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', background: 'rgba(255,0,0,0.1)', border: '1.5px solid rgba(255,0,0,0.4)', borderRadius: 14, color: '#ff4444', fontWeight: 700, fontSize: 14, padding: '13px', textDecoration: 'none' }}>
+              <ExternalLink size={18} />
+              {hasRef ? 'Listen to reference' : 'Find on YouTube'}
+            </a>
+          </div>
+        )
+      })()}
 
       {/* Lyrics */}
       <div style={{ padding: '0 20px' }}>
