@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Play, Lock, Star } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
-import BottomTabBar from '../components/BottomTabBar'
 import SubscribeSheet from '../components/SubscribeSheet'
 import LoginSheet from '../components/LoginSheet'
 
@@ -193,7 +192,6 @@ export default function Home() {
         </>
       )}
 
-      <BottomTabBar />
       {showSubscribe && <SubscribeSheet onClose={() => setShowSubscribe(false)} />}
       {showLogin && <LoginSheet onClose={() => setShowLogin(false)} />}
     </div>

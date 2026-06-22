@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
-import BottomTabBar from '../components/BottomTabBar'
 
 const FIJIAN_ALPHABET = ['A','B','C','D','E','F','G','I','K','L','M','N','Q','R','S','T','U','V','W','Y']
 
@@ -90,7 +89,6 @@ export default function AZIndex() {
         </div>
       )}
 
-      <BottomTabBar />
     </div>
   )
 }
