@@ -138,7 +138,7 @@ export default function SingMode() {
   }
 
   return (
-    <div onClick={handleScreenTap} style={{ background: '#070707', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div onClick={handleScreenTap} style={{ background: '#070707', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {/* Hidden audio element — plays instrumental in sync with scroll */}
       {hasAudio && (
         <audio key={activeAudioUrl} ref={audioRef} src={activeAudioUrl}
@@ -146,7 +146,7 @@ export default function SingMode() {
       )}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 20px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 20px', background: 'linear-gradient(to bottom, rgba(7,7,7,0.9), transparent)', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
         <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <X size={20} />
         </button>
@@ -175,9 +175,9 @@ export default function SingMode() {
         <div style={{ width: 20 }} />
       </div>
 
-      {/* Lyrics scroll */}
+      {/* Lyrics scroll — full screen */}
       <div ref={scrollRef}
-        style={{ flex: 1, overflowY: 'hidden', padding: '20px 20px 140px', textAlign: 'center' }}>
+        style={{ position: 'absolute', inset: 0, overflowY: 'hidden', padding: '20px 20px 20px', textAlign: 'center' }}>
         {/* Spacer so first line starts in center */}
         <div style={{ height: 180 }} />
         {lines.map((line, i) => {
@@ -210,7 +210,7 @@ export default function SingMode() {
       </div>
 
       {/* Control dock */}
-      <div style={{ background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', padding: '16px 20px 36px', flexShrink: 0, zIndex: 10, opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)', padding: '30px 20px 36px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
         {/* Track selector — only when both tracks available */}
         {hasBoth && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
