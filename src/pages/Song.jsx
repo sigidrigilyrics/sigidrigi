@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Heart, Share2, Play, Pause, Music, Youtube } from 'lucide-react'
+import { ChevronLeft, Heart, Share2, Play, Pause, Music, ExternalLink } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
 import SubscribeSheet from '../components/SubscribeSheet'
@@ -198,7 +198,7 @@ export default function Song() {
         <div style={{ margin: '0 20px 20px' }}>
           <a href={song.reference_url} target="_blank" rel="noopener noreferrer"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', background: 'rgba(255,0,0,0.1)', border: '1.5px solid rgba(255,0,0,0.4)', borderRadius: 14, color: '#ff4444', fontWeight: 700, fontSize: 14, padding: '13px', textDecoration: 'none' }}>
-            <Youtube size={18} />
+            <ExternalLink size={18} />
             Listen to reference
           </a>
         </div>
