@@ -14,7 +14,7 @@ import BottomTabBar from './components/BottomTabBar'
 function Layout() {
   const { pathname } = useLocation()
   const nav = useNavigate()
-  const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin')
+  const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin') || pathname.startsWith('/upload')
 
   // Android hardware/gesture back button → navigate within the app instead of minimizing.
   useEffect(() => {

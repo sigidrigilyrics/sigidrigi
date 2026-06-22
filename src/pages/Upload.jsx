@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Upload as UploadIcon, RefreshCw, Save } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 import { supabase } from '../lib/supabase'
-import BottomTabBar from '../components/BottomTabBar'
 
 const CORRECTIONS = [
   { from: /ngg/g, to: 'q', label: 'ngg → q' },
@@ -164,8 +163,6 @@ export default function Upload() {
           </div>
         )}
       </div>
-
-      <BottomTabBar />
     </div>
   )
 }

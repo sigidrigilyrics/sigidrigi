@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer'
@@ -253,10 +253,16 @@ export default function Admin() {
             Manage songs <Lock size={16} color="var(--accent)" />
           </h1>
         </div>
-        <button onClick={() => { setEditSong(null); setShowForm(true) }}
-          style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Plus size={20} color="#000" />
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button onClick={() => nav('/upload')} title="Photograph a songbook page"
+            style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg2)', border: '1px solid var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Camera size={18} color="var(--accent)" />
+          </button>
+          <button onClick={() => { setEditSong(null); setShowForm(true) }} title="Add song manually"
+            style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={20} color="#000" />
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
