@@ -98,7 +98,7 @@ function AudioUploader({ value, onChange, onBpmDetecting, onBpmDetected }) {
 }
 
 function SongFormSheet({ song, onClose, onSaved }) {
-  const [form, setForm] = useState(song || { title: '', artist: '', composer: '', category: '', lyrics: '', bpm: '', intro: '', province: '', source: '', free: false, verified: false, audio_url: '', audio_url_full: '' })
+  const [form, setForm] = useState(song || { title: '', artist: '', composer: '', category: '', lyrics: '', bpm: '', intro: '', province: '', source: '', reference_url: '', free: false, verified: false, audio_url: '', audio_url_full: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [bpmDetecting, setBpmDetecting] = useState(false)
@@ -127,7 +127,7 @@ function SongFormSheet({ song, onClose, onSaved }) {
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 20px' }} />
         <h2 className="font-playfair" style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>{song?.id ? 'Edit song' : 'Add song'}</h2>
         <form onSubmit={handleSubmit}>
-          {[['Title', 'title'], ['Artist', 'artist'], ['Composer', 'composer'], ['Category', 'category'], ['Province', 'province'], ['Source', 'source'], ['Intro (seconds)', 'intro']].map(([label, field]) => (
+          {[['Title', 'title'], ['Artist', 'artist'], ['Composer', 'composer'], ['Category', 'category'], ['Province', 'province'], ['Source', 'source'], ['YouTube / Reference URL', 'reference_url'], ['Intro (seconds)', 'intro']].map(([label, field]) => (
             <div key={field}>
               <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>{label}</p>
               <input style={inputStyle} value={form[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
