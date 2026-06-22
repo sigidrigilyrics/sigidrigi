@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Music } from 'lucide-react'
-import { supabase, isConfigured } from '../lib/supabase'
-import { MOCK_SONGS } from '../lib/mockData'
+import { loadCatalog } from '../lib/songs'
 
 export default function Artists() {
   const nav = useNavigate()
@@ -13,13 +12,7 @@ export default function Artists() {
 
   useEffect(() => {
     async function load() {
-      let data
-      if (!isConfigured) {
-        data = MOCK_SONGS
-      } else {
-        const { data: rows } = await supabase.from('songs').select('id,title,artist,category,free').order('title')
-        data = rows || []
-      }
+      const { songs: data } = await loadCatalog()
       // Group by artist
       const map = {}
       data.forEach(s => {

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Play, Lock, Star } from 'lucide-react'
+import { Search, Play, Lock, Star, WifiOff } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
-import { MOCK_SONGS } from '../lib/mockData'
+import { loadCatalog, getCachedCatalog } from '../lib/songs'
 import SubscribeSheet from '../components/SubscribeSheet'
 import LoginSheet from '../components/LoginSheet'
 
@@ -26,6 +26,7 @@ export default function Home() {
   const [showSubscribe, setShowSubscribe] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
   const [user, setUser] = useState(null)
+  const [offline, setOffline] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
@@ -35,17 +36,21 @@ export default function Home() {
   async function fetchSongs() {
     setLoading(true)
     setError(null)
-    if (!isConfigured) {
-      setSongs(MOCK_SONGS)
-      setFeatured(MOCK_SONGS.find(s => s.free) || MOCK_SONGS[0])
+    // Show cached catalogue instantly (works offline), then refresh from network.
+    const cached = getCachedCatalog()
+    if (cached && cached.length) {
+      setSongs(cached)
+      setFeatured(cached.find(s => s.free) || cached[0])
       setLoading(false)
-      return
     }
-    const { data, error } = await supabase.from('songs').select('*').order('title')
-    if (error) { setError(error.message); setLoading(false); return }
-    setSongs(data || [])
-    const feat = (data || []).find(s => s.free) || data?.[0]
-    setFeatured(feat)
+    const { songs, offline } = await loadCatalog()
+    setOffline(offline)
+    if (songs.length) {
+      setSongs(songs)
+      setFeatured(songs.find(s => s.free) || songs[0])
+    } else if (!cached?.length) {
+      setError('Could not load songs. Connect to the internet once to download them.')
+    }
     setLoading(false)
   }
 
@@ -78,6 +83,13 @@ export default function Home() {
       {!isConfigured && (
         <div style={{ margin: '0 20px 16px', background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.25)', borderRadius: 14, padding: '12px 14px', fontSize: 12, color: 'var(--gold)' }}>
           <strong>Demo mode</strong> — add your Supabase credentials to <code>.env.local</code> to go live.
+        </div>
+      )}
+
+      {/* Offline banner */}
+      {offline && (
+        <div style={{ margin: '0 20px 16px', background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.25)', borderRadius: 14, padding: '10px 14px', fontSize: 12, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <WifiOff size={14} /> Offline — showing your saved songs
         </div>
       )}
 

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Heart, Share2, Play, Pause, Music, ExternalLink } from 'lucide-react'
-import { supabase, isConfigured } from '../lib/supabase'
-import { MOCK_SONGS } from '../lib/mockData'
+import { loadSong, findCachedSong } from '../lib/songs'
 import { useFavorites } from '../lib/favorites'
 import SubscribeSheet from '../components/SubscribeSheet'
 
@@ -33,16 +32,11 @@ export default function Song() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      if (!isConfigured) {
-        const found = MOCK_SONGS.find(s => s.id === id)
-        setSong(found || null)
-        if (!found) setError('Song not found')
-        setLoading(false)
-        return
-      }
-      const { data, error } = await supabase.from('songs').select('*').eq('id', id).single()
-      if (error) setError(error.message)
-      else setSong(data)
+      const cached = findCachedSong(id)
+      if (cached) { setSong(cached); setLoading(false) }
+      const { song } = await loadSong(id)
+      if (song) setSong(song)
+      else if (!cached) setError('Song not found')
       setLoading(false)
     }
     load()

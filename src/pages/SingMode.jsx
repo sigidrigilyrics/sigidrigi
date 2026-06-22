@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music } from 'lucide-react'
-import { supabase, isConfigured } from '../lib/supabase'
-import { MOCK_SONGS } from '../lib/mockData'
+import { loadSong, findCachedSong } from '../lib/songs'
 
 export default function SingMode() {
   const { id } = useParams()
@@ -26,15 +25,11 @@ export default function SingMode() {
 
   useEffect(() => {
     async function load() {
-      let data, error
-      if (!isConfigured) {
-        data = MOCK_SONGS.find(s => s.id === id) || null
-        if (!data) error = { message: 'Song not found' }
-      } else {
-        ({ data, error } = await supabase.from('songs').select('*').eq('id', id).single())
-      }
-      if (error) setError(error.message)
-      else { setSong(data); if (data?.bpm) setBpm(data.bpm) }
+      const cached = findCachedSong(id)
+      if (cached) { setSong(cached); if (cached.bpm) setBpm(cached.bpm); setLoading(false) }
+      const { song } = await loadSong(id)
+      if (song) { setSong(song); if (song.bpm) setBpm(song.bpm) }
+      else if (!cached) setError('Song not found')
       setLoading(false)
     }
     load()

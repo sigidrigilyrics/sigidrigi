@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
-import { supabase, isConfigured } from '../lib/supabase'
-import { MOCK_SONGS } from '../lib/mockData'
+import { loadCatalog } from '../lib/songs'
 
 const FIJIAN_ALPHABET = ['A','B','C','D','E','F','G','I','K','L','M','N','Q','R','S','T','U','V','W','Y']
 
@@ -15,14 +14,8 @@ export default function AZIndex() {
 
   useEffect(() => {
     async function load() {
-      if (!isConfigured) {
-        setSongs(MOCK_SONGS.map(s => ({ id: s.id, title: s.title, category: s.category, free: s.free })))
-        setLoading(false)
-        return
-      }
-      const { data, error } = await supabase.from('songs').select('id,title,category,free').order('title')
-      if (error) setError(error.message)
-      else setSongs(data || [])
+      const { songs } = await loadCatalog()
+      setSongs(songs)
       setLoading(false)
     }
     load()

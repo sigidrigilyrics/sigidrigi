@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight, Heart, Star, Shield, Info, Music } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
-import { MOCK_SONGS } from '../lib/mockData'
+import { loadCatalog } from '../lib/songs'
 import { useFavorites } from '../lib/favorites'
 import LoginSheet from '../components/LoginSheet'
 import SubscribeSheet from '../components/SubscribeSheet'
@@ -25,11 +25,8 @@ export default function Account() {
         const { data } = await supabase.from('members').select('*').eq('id', user.id).single()
         setMember(data)
       }
-      if (!isConfigured) setSongs(MOCK_SONGS)
-      else {
-        const { data } = await supabase.from('songs').select('id,title,artist,category').order('title')
-        setSongs(data || [])
-      }
+      const { songs } = await loadCatalog()
+      setSongs(songs)
     }
     load()
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
