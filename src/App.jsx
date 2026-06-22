@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { App as CapApp } from '@capacitor/app'
 import Home from './pages/Home'
 import Song from './pages/Song'
 import SingMode from './pages/SingMode'
@@ -11,7 +13,21 @@ import BottomTabBar from './components/BottomTabBar'
 
 function Layout() {
   const { pathname } = useLocation()
+  const nav = useNavigate()
   const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin')
+
+  // Android hardware/gesture back button → navigate within the app instead of minimizing.
+  useEffect(() => {
+    let handle
+    CapApp.addListener('backButton', ({ canGoBack }) => {
+      if (window.location.pathname !== '/' && canGoBack) {
+        nav(-1)
+      } else {
+        CapApp.minimizeApp()
+      }
+    }).then(h => { handle = h }).catch(() => {})
+    return () => { if (handle) handle.remove() }
+  }, [nav])
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', maxWidth: 480, margin: '0 auto' }}>
       <Routes>
