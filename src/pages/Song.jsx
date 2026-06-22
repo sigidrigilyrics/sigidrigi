@@ -77,11 +77,25 @@ export default function Song() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 20px' }}>
-        <button onClick={() => nav(-1)} style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-          <ChevronLeft size={20} />
-        </button>
+      {/* Header + Category row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => nav(-1)} style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)', flexShrink: 0 }}>
+            <ChevronLeft size={20} />
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {song.category && (
+              <span style={{ border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
+                {song.category.toUpperCase()}
+              </span>
+            )}
+            {song.verified && (
+              <span style={{ border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
+                ✓ VERIFIED
+              </span>
+            )}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
             <Heart size={16} />
@@ -94,18 +108,6 @@ export default function Song() {
 
       {/* Title block */}
       <div style={{ padding: '0 20px 20px' }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {song.category && (
-            <span style={{ border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
-              {song.category.toUpperCase()}
-            </span>
-          )}
-          {song.verified && (
-            <span style={{ border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
-              ✓ VERIFIED
-            </span>
-          )}
-        </div>
         <h1 className="font-playfair" style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 8 }}>
           {song.title}
         </h1>
