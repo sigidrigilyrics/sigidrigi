@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Heart, Share2, Play, Pause, Music, ExternalLink } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
+import { useFavorites } from '../lib/favorites'
 import SubscribeSheet from '../components/SubscribeSheet'
 
 export default function Song() {
@@ -16,7 +17,18 @@ export default function Song() {
   const [duration, setDuration] = useState(0)
   const [showSubscribe, setShowSubscribe] = useState(false)
   const [track, setTrack] = useState('acoustic')
+  const [shared, setShared] = useState(false)
   const audioRef = useRef(null)
+  const { isFavorite, toggle } = useFavorites()
+
+  async function handleShare() {
+    const url = `${window.location.origin}/song/${id}`
+    const data = { title: song?.title, text: `${song?.title} — Sigidrigi`, url }
+    try {
+      if (navigator.share) await navigator.share(data)
+      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1800) }
+    } catch { /* user cancelled share */ }
+  }
 
   useEffect(() => {
     async function load() {
@@ -93,10 +105,12 @@ export default function Song() {
               ✓ VERIFIED
             </span>
           )}
-          <button style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-            <Heart size={16} />
+          <button onClick={() => toggle(song.id)}
+            style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isFavorite(song.id) ? 'var(--accent)' : 'var(--text)' }}>
+            <Heart size={16} fill={isFavorite(song.id) ? 'var(--accent)' : 'none'} />
           </button>
-          <button style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
+          <button onClick={handleShare}
+            style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: shared ? 'var(--accent)' : 'var(--text)' }}>
             <Share2 size={16} />
           </button>
         </div>

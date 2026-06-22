@@ -48,7 +48,7 @@ export default function SubscribeSheet({ onClose }) {
               UNLOCK THE ARCHIVE
             </span>
             <h2 className="font-playfair" style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Choose your plan</h2>
-            <p style={{ fontSize: 13, color: 'var(--text2)' }}>Cancel anytime · 1,000+ songs</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)' }}>Cancel anytime · growing Fijian archive</p>
           </div>
           <button onClick={onClose} style={{ background: 'var(--bg2)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)', flexShrink: 0 }}>
             <X size={16} />
@@ -59,7 +59,7 @@ export default function SubscribeSheet({ onClose }) {
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ color: 'var(--accent)', fontSize: 40, marginBottom: 12 }}>✓</div>
             <p style={{ fontWeight: 600, marginBottom: 6 }}>Request received!</p>
-            <p style={{ color: 'var(--text2)', fontSize: 13 }}>Admin will confirm your payment shortly.</p>
+            <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>We'll send you the {method} payment details and unlock your account once it's confirmed.</p>
           </div>
         ) : (
           <>
@@ -98,10 +98,10 @@ export default function SubscribeSheet({ onClose }) {
             </div>
 
             <button onClick={handleSubscribe} disabled={loading}
-              style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', marginBottom: 14 }}>
-              {loading ? 'Submitting…' : `Subscribe — $${prices[tier]} / month`}
+              style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', marginBottom: 12 }}>
+              {loading ? 'Submitting…' : `Request membership — $${prices[tier]}/mo`}
             </button>
-            <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text2)' }}>Already a member? <span style={{ color: 'var(--accent)', cursor: 'pointer' }}>Log in</span></p>
+            <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>Payments are confirmed manually during early access — we'll send {method} details after you request.</p>
           </>
         )}
       </div>

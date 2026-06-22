@@ -6,6 +6,7 @@ import AZIndex from './pages/AZIndex'
 import Upload from './pages/Upload'
 import Admin from './pages/Admin'
 import Artists from './pages/Artists'
+import Account from './pages/Account'
 import BottomTabBar from './components/BottomTabBar'
 
 function Layout() {
@@ -21,6 +22,7 @@ function Layout() {
         <Route path="/upload" element={<Upload />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/artists" element={<Artists />} />
+        <Route path="/account" element={<Account />} />
       </Routes>
       {!hideNav && <BottomTabBar />}
     </div>
