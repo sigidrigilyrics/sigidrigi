@@ -10,6 +10,7 @@ export default function Upload() {
   const fileRef = useRef(null)
   const [pages, setPages] = useState([]) // { name, url, preview }
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [error, setError] = useState(null)
 
   async function handleFiles(fileList) {
@@ -17,16 +18,21 @@ export default function Upload() {
     if (!files.length) return
     setError(null)
     setUploading(true)
-    for (const file of files) {
+    setProgress({ done: 0, total: files.length })
+    let done = 0
+    for (let idx = 0; idx < files.length; idx++) {
+      const file = files[idx]
       try {
-        const path = `pages/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
+        const path = `pages/${Date.now()}-${idx}-${file.name.replace(/\s+/g, '-')}`
         const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { cacheControl: '3600', upsert: false })
         if (upErr) throw upErr
         const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
         setPages(p => [...p, { name: file.name, url: publicUrl, preview: URL.createObjectURL(file) }])
       } catch (e) {
-        setError(e.message || 'Upload failed')
+        setError(`${file.name}: ${e.message || 'upload failed'}`)
       }
+      done++
+      setProgress({ done, total: files.length })
     }
     setUploading(false)
   }
@@ -49,11 +55,11 @@ export default function Upload() {
         <button onClick={() => fileRef.current?.click()} disabled={uploading}
           style={{ width: '100%', background: 'rgba(0,229,160,0.06)', border: '2px dashed rgba(0,229,160,0.35)', borderRadius: 18, padding: '34px 20px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <Camera size={32} color="var(--accent)" />
-          <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15 }}>{uploading ? 'Uploading…' : 'Photograph a page'}</p>
-          <p style={{ color: 'var(--text3)', fontSize: 12 }}>Snap each page — add as many as you like</p>
+          <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15 }}>{uploading ? `Uploading ${progress.done}/${progress.total}…` : 'Add songbook pages'}</p>
+          <p style={{ color: 'var(--text3)', fontSize: 12 }}>Take photos or pick several from your gallery</p>
         </button>
 
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple style={{ display: 'none' }}
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
           onChange={e => handleFiles(e.target.files)} />
 
         {error && (
