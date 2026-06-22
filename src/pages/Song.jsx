@@ -77,26 +77,22 @@ export default function Song() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
-      {/* Header + Category row */}
+      {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 20px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => nav(-1)} style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)', flexShrink: 0 }}>
-            <ChevronLeft size={20} />
-          </button>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {song.category && (
-              <span style={{ border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
-                {song.category.toUpperCase()}
-              </span>
-            )}
-            {song.verified && (
-              <span style={{ border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
-                ✓ VERIFIED
-              </span>
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={() => nav(-1)} style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)', flexShrink: 0 }}>
+          <ChevronLeft size={20} />
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {song.category && (
+            <span style={{ border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
+              {song.category.toUpperCase()}
+            </span>
+          )}
+          {song.verified && (
+            <span style={{ border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 10px', borderRadius: 999 }}>
+              ✓ VERIFIED
+            </span>
+          )}
           <button style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
             <Heart size={16} />
           </button>
