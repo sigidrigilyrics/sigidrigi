@@ -1,0 +1,4 @@
+# Transient downloaded songbook page images
+pages/
+# Generated parse/insert artifacts
+*.json
