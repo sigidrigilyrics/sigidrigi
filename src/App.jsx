@@ -9,12 +9,14 @@ import Upload from './pages/Upload'
 import Admin from './pages/Admin'
 import Artists from './pages/Artists'
 import Account from './pages/Account'
+import Legal from './pages/Legal'
 import BottomTabBar from './components/BottomTabBar'
 
 function Layout() {
   const { pathname } = useLocation()
   const nav = useNavigate()
   const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin') || pathname.startsWith('/upload')
+    || ['/terms', '/privacy', '/copyright'].includes(pathname)
 
   // Android hardware/gesture back button → navigate within the app instead of minimizing.
   useEffect(() => {
@@ -39,6 +41,9 @@ function Layout() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/artists" element={<Artists />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/terms" element={<Legal type="terms" />} />
+        <Route path="/privacy" element={<Legal type="privacy" />} />
+        <Route path="/copyright" element={<Legal type="copyright" />} />
       </Routes>
       {!hideNav && <BottomTabBar />}
     </div>

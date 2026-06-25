@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, ChevronRight, Heart, Star, Shield, Info, Music } from 'lucide-react'
+import { LogOut, ChevronRight, Heart, Star, Shield, Info, Music, FileText, Lock, Copyright } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { loadCatalog } from '../lib/songs'
 import { useFavorites } from '../lib/favorites'
@@ -133,6 +133,9 @@ export default function Account() {
         {[
           { label: 'Admin', icon: Shield, onClick: () => nav('/admin') },
           { label: 'About Sigidrigi', icon: Info, onClick: () => setShowAbout(true) },
+          { label: 'Terms of Use', icon: FileText, onClick: () => nav('/terms') },
+          { label: 'Privacy Policy', icon: Lock, onClick: () => nav('/privacy') },
+          { label: 'Copyright', icon: Copyright, onClick: () => nav('/copyright') },
         ].map(({ label, icon: Icon, onClick }) => (
           <button key={label} onClick={onClick}
             style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
