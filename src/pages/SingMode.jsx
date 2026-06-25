@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music } from 'lucide-react'
 import { loadSong, findCachedSong } from '../lib/songs'
+import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
 
 export default function SingMode() {
   const { id } = useParams()
@@ -17,11 +18,17 @@ export default function SingMode() {
   const [track, setTrack] = useState(searchParams.get('track') || 'acoustic')
   const [audioError, setAudioError] = useState(false)
   const [showControls, setShowControls] = useState(true)
+  const [ytReady, setYtReady] = useState(false)
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
   const scrollPosRef = useRef(0)
   const audioRef = useRef(null)
   const hideTimerRef = useRef(null)
+  const ytPlayerRef = useRef(null)
+
+  // Hidden YouTube instrumental is the primary backing source when present
+  const ytId = getYouTubeId(song?.instrumental_url)
+  const useYouTube = !!ytId
 
   useEffect(() => {
     async function load() {
@@ -36,6 +43,35 @@ export default function SingMode() {
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   }, [id])
 
+  // Hidden YouTube instrumental player — created when the song has a valid instrumental_url
+  useEffect(() => {
+    if (!ytId) { setYtReady(false); return }
+    let player
+    let cancelled = false
+    loadYouTubeAPI().then((YT) => {
+      if (cancelled) return
+      player = new YT.Player('yt-player', {
+        videoId: ytId,
+        playerVars: { controls: 0, playsinline: 1, rel: 0, modestbranding: 1 },
+        events: {
+          onReady: () => { ytPlayerRef.current = player; setYtReady(true) },
+          onStateChange: (e) => {
+            if (e.data === YT.PlayerState.PLAYING) setIsPlaying(true)
+            else if (e.data === YT.PlayerState.PAUSED) setIsPlaying(false)
+            else if (e.data === YT.PlayerState.ENDED) setIsPlaying(false)
+          },
+          onError: () => setAudioError(true),
+        },
+      })
+    }).catch(() => {})
+    return () => {
+      cancelled = true
+      try { player && player.destroy() } catch { /* already gone */ }
+      ytPlayerRef.current = null
+      setYtReady(false)
+    }
+  }, [ytId])
+
   const lineHeight = 52
 
   // Sync audio with play/pause
@@ -49,6 +85,14 @@ export default function SingMode() {
     }
   }, [isPlaying])
 
+  // Sync YouTube player with play/pause
+  useEffect(() => {
+    if (!useYouTube || !ytReady) return
+    const p = ytPlayerRef.current
+    if (!p) return
+    try { isPlaying ? p.playVideo() : p.pauseVideo() } catch { /* not ready */ }
+  }, [isPlaying, useYouTube, ytReady])
+
   useEffect(() => {
     if (!isPlaying) { if (rafRef.current) cancelAnimationFrame(rafRef.current); return }
     const scrollSpeed = (bpm / 60) * lineHeight * 0.5 * multiplier
@@ -59,13 +103,21 @@ export default function SingMode() {
       const dt = (ts - last) / 1000
       last = ts
 
-      const audio = audioRef.current
       const introSecs = song?.intro || 0
-      if (audio && !audio.paused && audio.currentTime > 0) {
-        // Lock scroll to audio time, offset by intro duration
-        scrollPosRef.current = Math.max(0, (audio.currentTime - introSecs) * scrollSpeed)
+      // Time source: hidden YouTube instrumental → MP3 → none
+      let t = 0
+      if (useYouTube) {
+        const p = ytPlayerRef.current
+        if (p && p.getCurrentTime) { try { t = p.getCurrentTime() || 0 } catch { t = 0 } }
       } else {
-        // No audio — accumulate independently (intro already waited via pause at start)
+        const audio = audioRef.current
+        if (audio && !audio.paused) t = audio.currentTime
+      }
+      if (t > 0) {
+        // Lock scroll to backing-track time, offset by intro duration
+        scrollPosRef.current = Math.max(0, (t - introSecs) * scrollSpeed)
+      } else {
+        // No backing audio — accumulate independently on tempo
         scrollPosRef.current += scrollSpeed * dt
       }
 
@@ -80,7 +132,7 @@ export default function SingMode() {
     }
     rafRef.current = requestAnimationFrame(step)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [isPlaying, bpm, multiplier])
+  }, [isPlaying, bpm, multiplier, useYouTube])
 
   // Auto-hide controls when playing, show when paused or tapped
   useEffect(() => {
@@ -105,7 +157,9 @@ export default function SingMode() {
     scrollPosRef.current = 0
     setCurrentLine(0)
     if (scrollRef.current) scrollRef.current.scrollTop = 0
-    if (audioRef.current) {
+    if (useYouTube && ytPlayerRef.current) {
+      try { ytPlayerRef.current.seekTo(0); if (isPlaying) ytPlayerRef.current.playVideo() } catch { /* not ready */ }
+    } else if (audioRef.current) {
       audioRef.current.currentTime = 0
       if (isPlaying) audioRef.current.play().catch(() => {})
     }
@@ -134,10 +188,17 @@ export default function SingMode() {
 
   return (
     <div onClick={handleScreenTap} style={{ background: '#070707', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {/* Hidden audio element — plays instrumental in sync with scroll */}
-      {hasAudio && (
+      {/* Hidden audio element — plays MP3 instrumental in sync with scroll (when no YouTube) */}
+      {!useYouTube && hasAudio && (
         <audio key={activeAudioUrl} ref={audioRef} src={activeAudioUrl}
           onError={() => setAudioError(true)} preload="auto" />
+      )}
+
+      {/* Hidden YouTube instrumental player — off-screen, audio only */}
+      {useYouTube && (
+        <div style={{ position: 'absolute', top: -9999, left: -9999, width: 240, height: 135, opacity: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+          <div id="yt-player" />
+        </div>
       )}
 
       {/* Header */}
@@ -147,8 +208,9 @@ export default function SingMode() {
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="font-playfair" style={{ fontSize: 18, fontWeight: 600 }}>{song.title}</span>
-          {hasAudio && !audioError && (() => {
-            const c = track === 'full' ? 'var(--gold)' : 'var(--accent)'
+          {(useYouTube || hasAudio) && !audioError && (() => {
+            const c = !useYouTube && track === 'full' ? 'var(--gold)' : 'var(--accent)'
+            const label = useYouTube ? 'MUSIC' : (track === 'full' ? 'FULL' : 'ACOUSTIC')
             return (
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: `rgba(0,0,0,0.3)`, border: `1px solid ${c}44`, borderRadius: 999, padding: '3px 8px' }}>
                 {isPlaying ? (
@@ -161,7 +223,7 @@ export default function SingMode() {
                   <Music size={10} color={c} />
                 )}
                 <span style={{ fontSize: 10, fontWeight: 700, color: c, letterSpacing: '0.05em' }}>
-                  {track === 'full' ? 'FULL' : 'ACOUSTIC'}
+                  {label}
                 </span>
               </span>
             )
@@ -206,8 +268,8 @@ export default function SingMode() {
 
       {/* Control dock */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)', padding: '30px 20px 36px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
-        {/* Track selector — only when both tracks available */}
-        {hasBoth && (
+        {/* Track selector — only when both MP3 tracks available (not for YouTube) */}
+        {!useYouTube && hasBoth && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
             {[
               { id: 'acoustic', label: 'Acoustic', color: 'var(--accent)' },
