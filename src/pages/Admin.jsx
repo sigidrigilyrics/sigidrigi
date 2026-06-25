@@ -144,15 +144,11 @@ function SongFormSheet({ song, onClose, onSaved }) {
           <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Lyrics</p>
           <textarea style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }} value={form.lyrics || ''} onChange={e => setForm(f => ({ ...f, lyrics: e.target.value }))} />
           <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Music size={13} /> Acoustic Guitar
+            <Music size={13} /> Audio file (MP3 — optional fallback)
           </p>
           <AudioUploader value={form.audio_url} onChange={url => setForm(f => ({ ...f, audio_url: url }))}
             onBpmDetecting={() => setBpmDetecting(true)}
             onBpmDetected={bpm => { setBpmDetecting(false); if (bpm) setForm(f => ({ ...f, bpm: String(bpm) })) }} />
-          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <Music size={13} /> Full Instrumental
-          </p>
-          <AudioUploader value={form.audio_url_full} onChange={url => setForm(f => ({ ...f, audio_url_full: url }))} />
           <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text2)' }}>
               <input type="checkbox" checked={form.free} onChange={e => setForm(f => ({ ...f, free: e.target.checked }))} style={{ accentColor: 'var(--accent)', width: 16, height: 16 }} />

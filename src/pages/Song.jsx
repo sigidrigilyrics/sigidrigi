@@ -15,7 +15,6 @@ export default function Song() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [showSubscribe, setShowSubscribe] = useState(false)
-  const [track, setTrack] = useState('acoustic')
   const [shared, setShared] = useState(false)
   const audioRef = useRef(null)
   const { isFavorite, toggle } = useFavorites()
@@ -46,18 +45,6 @@ export default function Song() {
     if (!audioRef.current) return
     if (playing) { audioRef.current.pause(); setPlaying(false) }
     else { audioRef.current.play(); setPlaying(true) }
-  }
-
-  function switchTrack(t) {
-    const wasPlaying = playing
-    if (audioRef.current) { audioRef.current.pause(); setPlaying(false) }
-    setTrack(t)
-    setCurrentTime(0)
-    setDuration(0)
-    // Audio src will update via src prop, then auto-play if it was playing
-    setTimeout(() => {
-      if (wasPlaying && audioRef.current) audioRef.current.play().then(() => setPlaying(true)).catch(() => {})
-    }, 80)
   }
 
   function fmt(s) {
@@ -128,63 +115,33 @@ export default function Song() {
         </div>
       </div>
 
-      {/* Audio player */}
-      {(song.audio_url || song.audio_url_full) ? (() => {
-        const hasAcoustic = !!song.audio_url
-        const hasFull = !!song.audio_url_full
-        const hasBoth = hasAcoustic && hasFull
-        const activeSrc = track === 'full' && hasFull ? song.audio_url_full : song.audio_url
-        const trackLabel = track === 'full' ? 'Full instrumental' : 'Acoustic guitar'
-        const trackColor = track === 'full' ? 'var(--gold)' : 'var(--accent)'
-        return (
-          <div style={{ margin: '0 20px 16px', background: 'var(--bg1)', borderRadius: 18, padding: '16px 18px' }}>
-            <audio key={activeSrc} ref={audioRef} src={activeSrc}
-              onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
-              onLoadedMetadata={e => setDuration(e.target.duration)}
-              onEnded={() => setPlaying(false)} />
-
-            {/* Track toggle — only show when both tracks available */}
-            {hasBoth && (
-              <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-                {[
-                  { id: 'acoustic', label: 'Acoustic', color: 'var(--accent)' },
-                  { id: 'full', label: 'Full Instrumental', color: 'var(--gold)' },
-                ].map(t => (
-                  <button key={t.id} onClick={() => switchTrack(t.id)}
-                    style={{
-                      flex: 1, background: track === t.id ? 'rgba(255,255,255,0.07)' : 'transparent',
-                      border: `1.5px solid ${track === t.id ? t.color : 'var(--border)'}`,
-                      borderRadius: 10, color: track === t.id ? t.color : 'var(--text2)',
-                      fontWeight: 700, fontSize: 11, padding: '8px 4px', cursor: 'pointer',
-                      letterSpacing: '0.03em',
-                    }}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-              <button onClick={togglePlay}
-                style={{ width: 50, height: 50, borderRadius: '50%', background: trackColor, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 22px rgba(0,0,0,0.3)`, flexShrink: 0 }}>
-                {playing ? <Pause size={20} color="#000" /> : <Play size={20} color="#000" fill="#000" />}
-              </button>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, color: trackColor }}>{trackLabel}</p>
-                <p style={{ color: 'var(--text2)', fontSize: 12 }}>{fmt(currentTime)} / {fmt(duration)}</p>
-              </div>
-            </div>
-            <div style={{ position: 'relative', height: 4, borderRadius: 2, background: 'var(--bg3)' }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${progress}%`, background: trackColor, borderRadius: 2, transition: 'width 0.2s' }} />
+      {/* Audio player — single MP3 fallback (most songs use the hidden YouTube instrumental in Sing Mode) */}
+      {song.audio_url && (
+        <div style={{ margin: '0 20px 16px', background: 'var(--bg1)', borderRadius: 18, padding: '16px 18px' }}>
+          <audio key={song.audio_url} ref={audioRef} src={song.audio_url}
+            onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
+            onLoadedMetadata={e => setDuration(e.target.duration)}
+            onEnded={() => setPlaying(false)} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+            <button onClick={togglePlay}
+              style={{ width: 50, height: 50, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 22px rgba(0,0,0,0.3)`, flexShrink: 0 }}>
+              {playing ? <Pause size={20} color="#000" /> : <Play size={20} color="#000" fill="#000" />}
+            </button>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, color: 'var(--accent)' }}>Audio</p>
+              <p style={{ color: 'var(--text2)', fontSize: 12 }}>{fmt(currentTime)} / {fmt(duration)}</p>
             </div>
           </div>
-        )
-      })() : null}
+          <div style={{ position: 'relative', height: 4, borderRadius: 2, background: 'var(--bg3)' }}>
+            <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${progress}%`, background: 'var(--accent)', borderRadius: 2, transition: 'width 0.2s' }} />
+          </div>
+        </div>
+      )}
 
       {/* Sing Mode CTA */}
       {song.free ? (
         <div style={{ margin: '0 20px 20px' }}>
-          <button onClick={() => nav(`/sing/${song.id}?track=${track}`)}
+          <button onClick={() => nav(`/sing/${song.id}`)}
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,229,160,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <Music size={18} />
             Enter Sing Mode

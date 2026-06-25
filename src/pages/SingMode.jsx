@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music } from 'lucide-react'
 import { loadSong, findCachedSong } from '../lib/songs'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
@@ -7,7 +7,6 @@ import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
 export default function SingMode() {
   const { id } = useParams()
   const nav = useNavigate()
-  const [searchParams] = useSearchParams()
   const [song, setSong] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -15,7 +14,6 @@ export default function SingMode() {
   const [bpm, setBpm] = useState(72)
   const [multiplier, setMultiplier] = useState(0.6)
   const [currentLine, setCurrentLine] = useState(0)
-  const [track, setTrack] = useState(searchParams.get('track') || 'acoustic')
   const [audioError, setAudioError] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [ytReady, setYtReady] = useState(false)
@@ -171,20 +169,8 @@ export default function SingMode() {
 
   const lines = (song.lyrics || '').split('\n').filter(Boolean)
   const isHeaderLine = (line) => /^(verse|chorus|bridge|outro|pre-?chorus|intro|hook|\[)/i.test(line.trim())
-  const hasAcoustic = !!song.audio_url
-  const hasFull = !!song.audio_url_full
-  const hasBoth = hasAcoustic && hasFull
-  const activeAudioUrl = track === 'full' && hasFull ? song.audio_url_full : song.audio_url
+  const activeAudioUrl = song.audio_url
   const hasAudio = !!activeAudioUrl
-
-  function switchTrack(t) {
-    const wasPlaying = isPlaying
-    setIsPlaying(false)
-    setAudioError(false)
-    setTrack(t)
-    // Re-play after src update if was playing
-    if (wasPlaying) setTimeout(() => setIsPlaying(true), 80)
-  }
 
   return (
     <div onClick={handleScreenTap} style={{ background: '#070707', height: '100vh', position: 'relative', overflow: 'hidden' }}>
@@ -209,8 +195,8 @@ export default function SingMode() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="font-playfair" style={{ fontSize: 18, fontWeight: 600 }}>{song.title}</span>
           {(useYouTube || hasAudio) && !audioError && (() => {
-            const c = !useYouTube && track === 'full' ? 'var(--gold)' : 'var(--accent)'
-            const label = useYouTube ? 'MUSIC' : (track === 'full' ? 'FULL' : 'ACOUSTIC')
+            const c = 'var(--accent)'
+            const label = useYouTube ? 'MUSIC' : 'AUDIO'
             return (
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: `rgba(0,0,0,0.3)`, border: `1px solid ${c}44`, borderRadius: 999, padding: '3px 8px' }}>
                 {isPlaying ? (
@@ -268,26 +254,6 @@ export default function SingMode() {
 
       {/* Control dock */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)', padding: '30px 20px 36px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
-        {/* Track selector — only when both MP3 tracks available (not for YouTube) */}
-        {!useYouTube && hasBoth && (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-            {[
-              { id: 'acoustic', label: 'Acoustic', color: 'var(--accent)' },
-              { id: 'full', label: 'Full Instrumental', color: 'var(--gold)' },
-            ].map(t => (
-              <button key={t.id} onClick={() => switchTrack(t.id)}
-                style={{
-                  flex: 1, background: track === t.id ? 'rgba(255,255,255,0.06)' : 'transparent',
-                  border: `1.5px solid ${track === t.id ? t.color : 'var(--border)'}`,
-                  borderRadius: 10, color: track === t.id ? t.color : 'var(--text3)',
-                  fontWeight: 700, fontSize: 11, padding: '8px 4px', cursor: 'pointer',
-                  letterSpacing: '0.03em',
-                }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        )}
         {/* BPM + speed row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
           <div style={{ background: 'var(--bg2)', borderRadius: 12, padding: '10px 14px', minWidth: 80 }}>
