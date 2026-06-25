@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 
-const CONTACT = 'diuz2beri@gmail.com'
+const CONTACT = 'sigidrigilyrics@gmail.com'
 const SITE = 'sigidrigi.vercel.app'
 const UPDATED = 'June 2026'
 
