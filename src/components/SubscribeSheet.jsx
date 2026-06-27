@@ -1,25 +1,34 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
+import { generateReferenceCode, PAYMENT_DETAILS, MEMBERSHIP_PRICE } from '../lib/membership'
 
 export default function SubscribeSheet({ onClose }) {
-  const [tier, setTier] = useState('member')
   const [method, setMethod] = useState('MPaisa')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [refCode, setRefCode] = useState('')
 
-  const prices = { member: 5, performer: 15 }
   const methods = ['MPaisa', 'MyCash', 'PayPal', 'Bank']
 
   async function handleSubscribe() {
-    if (!isConfigured) { setDone(true); return }
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
+    let email = ''
+    let userId = null
+    if (isConfigured) {
+      const { data: { user } } = await supabase.auth.getUser()
+      email = user?.email || ''
+      userId = user?.id || null
+    }
+    const code = generateReferenceCode(email)
+    setRefCode(code)
+    if (userId) {
       await supabase.from('members').upsert({
-        id: user.id,
-        email: user.email,
+        id: userId,
+        email,
         payment_method: method,
+        amount_paid: MEMBERSHIP_PRICE,
+        reference_code: code,
         status: 'pending',
         subscribed_at: new Date().toISOString(),
       })
@@ -45,10 +54,10 @@ export default function SubscribeSheet({ onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
             <span style={{ background: 'rgba(255,184,0,0.15)', color: 'var(--gold)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', padding: '4px 10px', borderRadius: 999, display: 'inline-block', marginBottom: 10 }}>
-              UNLOCK THE ARCHIVE
+              {done ? 'PAYMENT DETAILS' : 'UNLOCK THE ARCHIVE'}
             </span>
-            <h2 className="font-playfair" style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Choose your plan</h2>
-            <p style={{ fontSize: 13, color: 'var(--text2)' }}>Cancel anytime · growing Fijian archive</p>
+            <h2 className="font-playfair" style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>{done ? 'Almost there!' : 'Become a member'}</h2>
+            <p style={{ fontSize: 13, color: 'var(--text2)' }}>{done ? 'Send your payment, then message us the receipt' : 'Cancel anytime · growing Fijian archive'}</p>
           </div>
           <button onClick={onClose} style={{ background: 'var(--bg2)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)', flexShrink: 0 }}>
             <X size={16} />
@@ -56,35 +65,42 @@ export default function SubscribeSheet({ onClose }) {
         </div>
 
         {done ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ color: 'var(--accent)', fontSize: 40, marginBottom: 12 }}>✓</div>
-            <p style={{ fontWeight: 600, marginBottom: 6 }}>Request received!</p>
-            <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>We'll send you the {method} payment details and unlock your account once it's confirmed.</p>
-          </div>
-        ) : (
           <>
-            {/* Tier cards */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-              {[
-                { id: 'member', price: '$5/mo', name: 'Member', desc: 'Full archive + instrumentals', badge: null },
-                { id: 'performer', price: '$15/mo', name: 'Performer', desc: 'Everything + Sing Mode sync', badge: 'BPM + SETLISTS' },
-              ].map(t => (
-                <button key={t.id} onClick={() => setTier(t.id)}
-                  style={{
-                    flex: 1, background: tier === t.id ? 'rgba(0,229,160,0.08)' : 'var(--bg2)',
-                    border: tier === t.id ? '1.5px solid var(--accent)' : '1.5px solid transparent',
-                    borderRadius: 14, padding: '14px 12px', cursor: 'pointer', textAlign: 'left'
-                  }}>
-                  {t.badge && (
-                    <span style={{ background: 'rgba(255,184,0,0.15)', color: 'var(--gold)', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '3px 7px', borderRadius: 999, display: 'inline-block', marginBottom: 8 }}>{t.badge}</span>
-                  )}
-                  <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{t.name} <span style={{ color: tier === t.id ? 'var(--accent)' : 'var(--text2)', fontWeight: 500, fontSize: 13 }}>{t.price}</span></div>
-                  <div style={{ color: 'var(--text2)', fontSize: 12 }}>{t.desc}</div>
-                </button>
-              ))}
+            {/* Reference code */}
+            <div style={{ background: 'var(--bg2)', borderRadius: 12, padding: '12px 14px', marginBottom: 12, textAlign: 'center' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Your reference code</p>
+              <p className="font-playfair" style={{ fontSize: 24, fontWeight: 800, color: 'var(--gold)', letterSpacing: '0.04em' }}>{refCode}</p>
             </div>
 
-            {/* Payment methods */}
+            {/* Payment instructions */}
+            <div style={{ background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 12, padding: '14px', marginBottom: 16 }}>
+              <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7 }}>
+                Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>{method}</strong> to:
+              </p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{PAYMENT_DETAILS[method]}</p>
+              <p style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
+                Quote reference <strong>{refCode}</strong>, then message your receipt to <strong>sigidrigilyrics@gmail.com</strong>. We'll activate your account within 24 hours. 🌺
+              </p>
+            </div>
+
+            <button onClick={onClose}
+              style={{ width: '100%', background: 'var(--bg2)', border: 'none', borderRadius: 12, color: 'var(--text)', fontWeight: 600, fontSize: 14, padding: '13px', cursor: 'pointer' }}>
+              Done
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Single membership */}
+            <div style={{ background: 'rgba(0,229,160,0.08)', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '16px', marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                <span style={{ fontWeight: 800, fontSize: 18 }}>Membership</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15 }}>${MEMBERSHIP_PRICE} FJD/mo</span>
+              </div>
+              <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>Full access to the whole archive + Sing Mode with backing tracks. Cancel anytime.</p>
+            </div>
+
+            {/* Payment method */}
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 8 }}>Pay with</p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               {methods.map(m => (
                 <button key={m} onClick={() => setMethod(m)}
@@ -99,9 +115,9 @@ export default function SubscribeSheet({ onClose }) {
 
             <button onClick={handleSubscribe} disabled={loading}
               style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', marginBottom: 12 }}>
-              {loading ? 'Submitting…' : `Request membership — $${prices[tier]}/mo`}
+              {loading ? 'Submitting…' : `Get membership — $${MEMBERSHIP_PRICE}/mo`}
             </button>
-            <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>Payments are confirmed manually during early access — we'll send {method} details after you request.</p>
+            <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>Payments are confirmed manually during early access. You'll get a reference code + payment details next.</p>
           </>
         )}
       </div>

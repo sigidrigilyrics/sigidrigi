@@ -1,47 +1,35 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight, Heart, Star, Shield, Info, Music, FileText, Lock, Copyright } from 'lucide-react'
-import { supabase, isConfigured } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { loadCatalog } from '../lib/songs'
 import { useFavorites } from '../lib/favorites'
+import { useMembership } from '../lib/membership'
 import LoginSheet from '../components/LoginSheet'
 import SubscribeSheet from '../components/SubscribeSheet'
 
 export default function Account() {
   const nav = useNavigate()
   const { favorites } = useFavorites()
-  const [user, setUser] = useState(null)
-  const [member, setMember] = useState(null)
+  const { user, member, isMember, refresh } = useMembership()
   const [songs, setSongs] = useState([])
   const [showLogin, setShowLogin] = useState(false)
   const [showSubscribe, setShowSubscribe] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
 
   useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      if (user && isConfigured) {
-        const { data } = await supabase.from('members').select('*').eq('id', user.id).single()
-        setMember(data)
-      }
-      const { songs } = await loadCatalog()
-      setSongs(songs)
-    }
-    load()
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
-    return () => sub?.subscription?.unsubscribe?.()
+    loadCatalog().then(({ songs }) => setSongs(songs))
   }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setUser(null)
-    setMember(null)
+    refresh()
   }
 
   const favSongs = favorites.map(id => songs.find(s => s.id === id)).filter(Boolean)
-  const plan = member?.status === 'active' ? 'Member' : member?.status === 'pending' ? 'Pending' : 'Free'
+  const plan = isMember ? 'Member' : member?.status === 'pending' ? 'Pending' : 'Free'
   const planColor = plan === 'Member' ? 'var(--accent)' : plan === 'Pending' ? 'var(--gold)' : 'var(--text3)'
+  const expiryDate = isMember && member?.expires_at ? new Date(member.expires_at).toLocaleDateString() : null
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -66,6 +54,7 @@ export default function Account() {
             <span style={{ display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: planColor, border: `1px solid ${planColor}`, borderRadius: 999, padding: '2px 9px' }}>
               {plan.toUpperCase()} PLAN
             </span>
+            {expiryDate && <span style={{ display: 'block', marginTop: 5, fontSize: 11, color: 'var(--text3)' }}>Active until {expiryDate}</span>}
           </div>
         </div>
         {user ? (

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Heart, Share2, Play, Pause, Music, ExternalLink } from 'lucide-react'
 import { loadSong, findCachedSong } from '../lib/songs'
 import { useFavorites } from '../lib/favorites'
+import { useMembership, canAccess } from '../lib/membership'
 import SubscribeSheet from '../components/SubscribeSheet'
 
 export default function Song() {
@@ -18,6 +19,7 @@ export default function Song() {
   const [shared, setShared] = useState(false)
   const audioRef = useRef(null)
   const { isFavorite, toggle } = useFavorites()
+  const { isMember } = useMembership()
 
   async function handleShare() {
     const url = `${window.location.origin}/song/${id}`
@@ -139,7 +141,7 @@ export default function Song() {
       )}
 
       {/* Sing Mode CTA */}
-      {song.free ? (
+      {canAccess(song, isMember) ? (
         <div style={{ margin: '0 20px 20px' }}>
           <button onClick={() => nav(`/sing/${song.id}`)}
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,229,160,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -175,7 +177,7 @@ export default function Song() {
 
       {/* Lyrics */}
       <div style={{ padding: '0 20px' }}>
-        {song.free ? (
+        {canAccess(song, isMember) ? (
           <>
             {lines.map((line, i) => {
               const isChorusHeader = line.toLowerCase().includes('[chorus]') || line.toLowerCase().includes('chorus:')

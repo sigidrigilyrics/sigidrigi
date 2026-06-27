@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Play, Lock, Star, WifiOff } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { loadCatalog, getCachedCatalog } from '../lib/songs'
+import { useMembership } from '../lib/membership'
 import SubscribeSheet from '../components/SubscribeSheet'
 import LoginSheet from '../components/LoginSheet'
 
@@ -27,6 +28,7 @@ export default function Home() {
   const [showLogin, setShowLogin] = useState(false)
   const [user, setUser] = useState(null)
   const [offline, setOffline] = useState(false)
+  const { isMember } = useMembership()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
@@ -61,6 +63,7 @@ export default function Home() {
   const lockedSongs = filtered.filter(s => !s.free)
 
   function handleLocked(song) {
+    if (isMember) { nav(`/song/${song.id}`); return }
     if (!user) { setShowLogin(true); return }
     setShowSubscribe(true)
   }

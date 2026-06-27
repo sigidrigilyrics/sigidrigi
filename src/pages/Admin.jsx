@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
+import { isActiveMember } from '../lib/membership'
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer'
 
 const ADMIN_PASSWORD = 'sigidrigi2025'
@@ -170,6 +171,52 @@ function SongFormSheet({ song, onClose, onSaved }) {
   )
 }
 
+const mBtnPrimary = { background: 'var(--accent)', border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 12, padding: '7px 12px', cursor: 'pointer' }
+const mBtnSecondary = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontWeight: 600, fontSize: 12, padding: '7px 12px', cursor: 'pointer' }
+const mBtnDanger = { background: 'rgba(255,107,107,0.1)', border: 'none', borderRadius: 8, color: 'var(--danger)', fontWeight: 600, fontSize: 12, padding: '7px 12px', cursor: 'pointer' }
+
+function MembersPanel({ members, filter, setFilter, onActivate, onRenew, onDeactivate }) {
+  const now = new Date()
+  const sevenDays = new Date(now); sevenDays.setDate(sevenDays.getDate() + 7)
+  const active = m => m.status === 'active' && m.expires_at && new Date(m.expires_at) > now
+  const buckets = {
+    pending: members.filter(m => m.status === 'pending'),
+    active: members.filter(active),
+    expiring: members.filter(m => active(m) && new Date(m.expires_at) <= sevenDays),
+    expired: members.filter(m => !active(m) && m.status !== 'pending'),
+  }
+  const list = buckets[filter] || []
+  const filters = [['pending', 'Pending'], ['active', 'Active'], ['expiring', 'Expiring'], ['expired', 'Expired']]
+  return (
+    <div style={{ padding: '0 20px' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {filters.map(([id, label]) => (
+          <button key={id} onClick={() => setFilter(id)}
+            style={{ background: filter === id ? 'rgba(0,229,160,0.12)' : 'var(--bg2)', border: filter === id ? '1px solid var(--accent)' : '1px solid transparent', borderRadius: 999, color: filter === id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 11, padding: '6px 12px', cursor: 'pointer' }}>
+            {label}{buckets[id]?.length ? ` · ${buckets[id].length}` : ''}
+          </button>
+        ))}
+      </div>
+      {list.length === 0 && <p style={{ color: 'var(--text3)', fontSize: 14, padding: '14px 0' }}>No {filter} members.</p>}
+      {list.map(m => (
+        <div key={m.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+          <p style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email || '—'}</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+            {m.reference_code ? `${m.reference_code} · ` : ''}{m.payment_method || ''}
+            {m.expires_at ? ` · until ${new Date(m.expires_at).toLocaleDateString()}` : ''}
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {m.status === 'pending' && <button onClick={() => onActivate(m)} style={mBtnPrimary}>✓ Activate (30 days)</button>}
+            {active(m) && <button onClick={() => onRenew(m)} style={mBtnSecondary}>+30 days</button>}
+            {active(m) && <button onClick={() => onDeactivate(m)} style={mBtnDanger}>Deactivate</button>}
+            {!active(m) && m.status !== 'pending' && <button onClick={() => onActivate(m)} style={mBtnPrimary}>Reactivate (30 days)</button>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Admin() {
   const nav = useNavigate()
   const [unlocked, setUnlocked] = useState(false)
@@ -183,6 +230,8 @@ export default function Admin() {
   const [editSong, setEditSong] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
+  const [tab, setTab] = useState('songs')
+  const [memberFilter, setMemberFilter] = useState('pending')
 
   function unlock() {
     if (pw === ADMIN_PASSWORD) { setUnlocked(true); loadData() }
@@ -200,7 +249,7 @@ export default function Admin() {
     }
     const [{ data: s }, { data: m }, { data: u }] = await Promise.all([
       supabase.from('songs').select('*').order('title'),
-      supabase.from('members').select('id').eq('status', 'active'),
+      supabase.from('members').select('*').order('subscribed_at', { ascending: false }),
       supabase.from('songs').select('id').eq('verified', false),
     ])
     setSongs(s || [])
@@ -212,6 +261,24 @@ export default function Admin() {
   async function handleDelete(id) {
     await supabase.from('songs').delete().eq('id', id)
     setDeleteId(null)
+    loadData()
+  }
+
+  async function activateMember(m) {
+    const now = new Date()
+    const expires = new Date(now)
+    expires.setDate(expires.getDate() + 30)
+    await supabase.from('members').update({ status: 'active', paid_at: now.toISOString(), expires_at: expires.toISOString() }).eq('id', m.id)
+    loadData()
+  }
+  async function renewMember(m) {
+    const base = m.expires_at && new Date(m.expires_at) > new Date() ? new Date(m.expires_at) : new Date()
+    base.setDate(base.getDate() + 30)
+    await supabase.from('members').update({ status: 'active', expires_at: base.toISOString() }).eq('id', m.id)
+    loadData()
+  }
+  async function deactivateMember(m) {
+    await supabase.from('members').update({ status: 'expired' }).eq('id', m.id)
     loadData()
   }
 
@@ -261,11 +328,23 @@ export default function Admin() {
         </div>
       </div>
 
+      {/* Tab toggle */}
+      <div style={{ display: 'flex', gap: 8, padding: '0 20px', marginBottom: 18 }}>
+        {[['songs', 'Songs'], ['members', 'Members']].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ flex: 1, background: tab === id ? 'rgba(0,229,160,0.1)' : 'var(--bg2)', border: tab === id ? '1.5px solid var(--accent)' : '1.5px solid transparent', borderRadius: 10, color: tab === id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 13, padding: '9px', cursor: 'pointer' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'songs' && (
+      <>
       {/* Stats */}
       <div style={{ display: 'flex', gap: 10, padding: '0 20px', marginBottom: 20 }}>
         {[
           { label: 'Total songs', value: songs.length, color: 'var(--text)' },
-          { label: 'Members', value: members.length, color: 'var(--accent)' },
+          { label: 'Members', value: members.filter(isActiveMember).length, color: 'var(--accent)' },
           { label: 'To verify', value: unverified.length, color: 'var(--gold)' },
         ].map(({ label, value, color }) => (
           <div key={label} style={{ flex: 1, background: 'var(--bg1)', borderRadius: 14, padding: '14px 12px', textAlign: 'center' }}>
@@ -311,6 +390,13 @@ export default function Admin() {
           <p style={{ color: 'var(--text3)', fontSize: 14, padding: '20px 0' }}>No songs found.</p>
         )}
       </div>
+      </>
+      )}
+
+      {tab === 'members' && (
+        <MembersPanel members={members} filter={memberFilter} setFilter={setMemberFilter}
+          onActivate={activateMember} onRenew={renewMember} onDeactivate={deactivateMember} />
+      )}
 
       {/* Delete confirm */}
       {deleteId && (
