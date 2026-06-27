@@ -17,12 +17,15 @@ export default function SingMode() {
   const [audioError, setAudioError] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [ytReady, setYtReady] = useState(false)
+  const [scrollStarted, setScrollStarted] = useState(false)
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
   const scrollPosRef = useRef(0)
   const audioRef = useRef(null)
   const hideTimerRef = useRef(null)
   const ytPlayerRef = useRef(null)
+  const playStartRef = useRef(null)
+  const scrollStartedRef = useRef(false)
 
   // Hidden YouTube instrumental is the primary backing source when present
   const ytId = getYouTubeId(song?.instrumental_url)
@@ -92,7 +95,12 @@ export default function SingMode() {
   }, [isPlaying, useYouTube, ytReady])
 
   useEffect(() => {
-    if (!isPlaying) { if (rafRef.current) cancelAnimationFrame(rafRef.current); return }
+    if (!isPlaying) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      playStartRef.current = null
+      return
+    }
+    if (!playStartRef.current) playStartRef.current = Date.now()
     const scrollSpeed = (bpm / 60) * lineHeight * 0.5 * multiplier
 
     let last = null
@@ -102,7 +110,9 @@ export default function SingMode() {
       last = ts
 
       const introSecs = song?.intro || 0
-      // Time source: hidden YouTube instrumental → MP3 → none
+      const hasIntro = introSecs > 0
+
+      // Time source: YouTube → MP3 → BPM clock
       let t = 0
       if (useYouTube) {
         const p = ytPlayerRef.current
@@ -111,13 +121,19 @@ export default function SingMode() {
         const audio = audioRef.current
         if (audio && !audio.paused) t = audio.currentTime
       }
+
       if (t > 0) {
-        // Lock scroll to backing-track time, offset by intro duration
+        // Audio-backed: lock to audio time with intro offset
         scrollPosRef.current = Math.max(0, (t - introSecs) * scrollSpeed)
-      } else {
-        // No backing audio — accumulate independently on tempo
+      } else if (hasIntro) {
+        // BPM + intro set: use wall-clock elapsed to count down intro then scroll
+        const elapsed = (Date.now() - playStartRef.current) / 1000
+        scrollPosRef.current = Math.max(0, (elapsed - introSecs) * scrollSpeed)
+      } else if (scrollStartedRef.current) {
+        // BPM + no intro: accumulate dt only after user taps Start scroll
         scrollPosRef.current += scrollSpeed * dt
       }
+      // else: no intro, not started — hold at 0
 
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollPosRef.current
@@ -151,9 +167,17 @@ export default function SingMode() {
     }
   }
 
+  function handleScrollStart() {
+    scrollStartedRef.current = true
+    setScrollStarted(true)
+  }
+
   function handleRestart() {
     scrollPosRef.current = 0
     setCurrentLine(0)
+    playStartRef.current = isPlaying ? Date.now() : null
+    scrollStartedRef.current = false
+    setScrollStarted(false)
     if (scrollRef.current) scrollRef.current.scrollTop = 0
     if (useYouTube && ytPlayerRef.current) {
       try { ytPlayerRef.current.seekTo(0); if (isPlaying) ytPlayerRef.current.playVideo() } catch { /* not ready */ }
@@ -251,6 +275,16 @@ export default function SingMode() {
         })}
         <div style={{ height: 200 }} />
       </div>
+
+      {/* Tap to start scroll — shown when playing, no intro set, scroll not yet started */}
+      {isPlaying && !(song?.intro > 0) && !scrollStarted && (
+        <div style={{ position: 'absolute', bottom: 180, left: 0, right: 0, zIndex: 30, display: 'flex', justifyContent: 'center' }}>
+          <button onClick={e => { e.stopPropagation(); handleScrollStart() }}
+            style={{ background: 'var(--accent)', border: 'none', borderRadius: 999, color: '#000', fontWeight: 800, fontSize: 15, padding: '14px 32px', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,229,160,0.5)', animation: 'pulse 1.2s ease-in-out infinite', letterSpacing: '0.04em' }}>
+            ▶ TAP WHEN SINGING STARTS
+          </button>
+        </div>
+      )}
 
       {/* Control dock */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)', padding: '30px 20px 36px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
