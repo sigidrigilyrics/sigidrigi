@@ -14,8 +14,7 @@ export const MEMBERSHIP_PRICE = 5 // FJD / month
 export const PAYMENT_DETAILS = {
   MPaisa: '679 244 0483',
   MyCash: '679 740 9712',
-  PayPal: 'paypal.me/yourname',
-  Bank: 'BSP, Sigidrigi Lyrics, 1234567',
+  Bank: 'ANZ, Digitaki & Litia Tuberi, 12213358',
 }
 
 // Reference code e.g. SGD-DIU-4821 — the user quotes this with their payment.
