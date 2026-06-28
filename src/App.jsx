@@ -10,6 +10,8 @@ import Admin from './pages/Admin'
 import Artists from './pages/Artists'
 import Account from './pages/Account'
 import Legal from './pages/Legal'
+import Browse from './pages/Browse'
+import Favorites from './pages/Favorites'
 import BottomTabBar from './components/BottomTabBar'
 
 function Layout() {
@@ -37,6 +39,8 @@ function Layout() {
         <Route path="/song/:id" element={<Song />} />
         <Route path="/sing/:id" element={<SingMode />} />
         <Route path="/index" element={<AZIndex />} />
+        <Route path="/browse" element={<Browse />} />
+        <Route path="/favorites" element={<Favorites />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/artists" element={<Artists />} />

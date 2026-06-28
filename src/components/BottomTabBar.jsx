@@ -1,5 +1,16 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Search, User, Mic2 } from 'lucide-react'
+import { Home, Search, Heart, User, Mic } from 'lucide-react'
+import { getCachedCatalog } from '../lib/songs'
+
+// Picks a stable "song of the day" so the centre Sing button always has a song.
+function songOfTheDay() {
+  const cat = getCachedCatalog() || []
+  if (!cat.length) return null
+  const day = Math.floor(Date.now() / 86400000)
+  const pool = cat.filter(s => s.verified || s.free)
+  const base = pool.length ? pool : cat
+  return base[(day * 3) % base.length]
+}
 
 export default function BottomTabBar() {
   const nav = useNavigate()
@@ -7,33 +18,47 @@ export default function BottomTabBar() {
 
   const tabs = [
     { label: 'Home', icon: Home, path: '/' },
-    { label: 'Search', icon: Search, path: '/?search=1' },
-    { label: 'Artists', icon: Mic2, path: '/artists' },
-    { label: 'Index', icon: null, path: '/index' },
-    { label: 'Account', icon: User, path: '/account' },
+    { label: 'Search', icon: Search, path: '/browse' },
+    { label: 'Favorites', icon: Heart, path: '/favorites' },
+    { label: 'Profile', icon: User, path: '/account' },
   ]
+  const active = (path) => pathname === path
 
-  const active = (path) => pathname === path.split('?')[0]
+  function startSing() {
+    const s = songOfTheDay()
+    nav(s ? `/sing/${s.id}` : '/browse')
+  }
 
   return (
-    <div style={{ background: 'rgba(10,10,10,0.96)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)' }}
-      className="fixed bottom-0 left-0 right-0 flex justify-around items-center py-3 px-1"
-      style={{ background: 'rgba(10,10,10,0.96)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', maxWidth: 480, margin: '0 auto', left: '50%', transform: 'translateX(-50%)', width: '100%', zIndex: 50 }}>
-      {tabs.map(({ label, icon: Icon, path }) => {
-        const isActive = active(path)
-        return (
-          <button key={label} onClick={() => nav(path.split('?')[0])}
-            style={{ color: isActive ? 'var(--accent)' : 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}
-            className="flex flex-col items-center gap-1">
-            {label === 'Index' ? (
-              <span className="font-playfair" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: isActive ? 'var(--accent)' : 'var(--text3)' }}>Az</span>
-            ) : (
-              <Icon size={20} />
-            )}
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>{label}</span>
-          </button>
-        )
-      })}
+    <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, zIndex: 50, background: 'rgba(10,10,10,0.96)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-around', padding: '10px 6px 14px' }}>
+      {/* Left two tabs */}
+      {tabs.slice(0, 2).map(({ label, icon: Icon, path }) => (
+        <Tab key={label} label={label} Icon={Icon} isActive={active(path)} onClick={() => nav(path)} />
+      ))}
+
+      {/* Centre Sing button (raised) */}
+      <button onClick={startSing} aria-label="Sing"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, marginTop: -22 }}>
+        <span style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 22px rgba(0,229,160,0.45)', border: '4px solid #0A0A0A' }}>
+          <Mic size={24} color="#000" />
+        </span>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--accent)' }}>Sing</span>
+      </button>
+
+      {/* Right two tabs */}
+      {tabs.slice(2).map(({ label, icon: Icon, path }) => (
+        <Tab key={label} label={label} Icon={Icon} isActive={active(path)} onClick={() => nav(path)} />
+      ))}
     </div>
+  )
+}
+
+function Tab({ label, Icon, isActive, onClick }) {
+  return (
+    <button onClick={onClick}
+      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: isActive ? 'var(--accent)' : 'var(--text3)', minWidth: 56, paddingTop: 4 }}>
+      <Icon size={20} />
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>{label}</span>
+    </button>
   )
 }

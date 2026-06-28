@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Heart, Share2, Play, Pause, Music, ExternalLink } from 'lucide-react'
 import { loadSong, findCachedSong } from '../lib/songs'
+import { pushRecent } from '../lib/recent'
 import { useFavorites } from '../lib/favorites'
 import { useMembership, canAccess } from '../lib/membership'
 import SubscribeSheet from '../components/SubscribeSheet'
@@ -31,6 +32,7 @@ export default function Song() {
   }
 
   useEffect(() => {
+    pushRecent(id)
     async function load() {
       setLoading(true)
       const cached = findCachedSong(id)

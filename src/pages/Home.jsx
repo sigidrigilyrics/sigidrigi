@@ -1,36 +1,42 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Play, Lock, Star, WifiOff, X } from 'lucide-react'
+import { Search, Play, WifiOff, ChevronRight, SlidersHorizontal,
+  Heart, Church, Users, Baby, Landmark, Sparkles, Music, BookOpen, Sunrise, Waves } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { loadCatalog, getCachedCatalog } from '../lib/songs'
-import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
-import SubscribeSheet from '../components/SubscribeSheet'
+import { useMembership } from '../lib/membership'
+import { useRecent } from '../lib/recent'
+import CardImage from '../components/CardImage'
+import SongRow from '../components/SongRow'
 import LoginSheet from '../components/LoginSheet'
 
-function Equalizer() {
-  return (
-    <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 16 }}>
-      {[10, 14, 8, 12, 7].map((h, i) => (
-        <div key={i} className="eq-bar" style={{ width: 3, height: h, background: 'var(--accent)', borderRadius: 2 }} />
-      ))}
-    </div>
-  )
+// Colour + icon per category (graceful default for any unknown name).
+function categoryStyle(name) {
+  const n = (name || '').toLowerCase()
+  if (n.includes('love')) return { color: '#ED93B1', Icon: Heart }
+  if (n.includes('relig') || n.includes('devot') || n.includes('church') || n.includes('hymn')) return { color: '#9B8CFF', Icon: Church }
+  if (n.includes('choir') || n.includes('group')) return { color: '#5BA8F0', Icon: Users }
+  if (n.includes('child') || n.includes('kid')) return { color: '#F0B24B', Icon: Baby }
+  if (n.includes('histor')) return { color: '#C8A24B', Icon: Landmark }
+  if (n.includes('celebr') || n.includes('party')) return { color: '#FFB800', Icon: Sparkles }
+  if (n.includes('farewell') || n.includes('isa')) return { color: '#F0997B', Icon: Sunrise }
+  if (n.includes('welcome') || n.includes('bula')) return { color: '#1DC9A0', Icon: Waves }
+  if (n.includes('story') || n.includes('legend')) return { color: '#7FB069', Icon: BookOpen }
+  return { color: '#00E5A0', Icon: Music }
 }
 
 export default function Home() {
   const nav = useNavigate()
   const [songs, setSongs] = useState([])
-  const [featured, setFeatured] = useState(null)
-  const [query, setQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('All')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [showSubscribe, setShowSubscribe] = useState(false)
-  const [showLogin, setShowLogin] = useState(false)
   const [user, setUser] = useState(null)
   const [offline, setOffline] = useState(false)
+  const [heroIndex, setHeroIndex] = useState(0)
+  const [showLogin, setShowLogin] = useState(false)
   const { isMember } = useMembership()
-  const searchRef = useRef(null)
+  const { recent } = useRecent()
+  const heroRef = useRef(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
@@ -41,64 +47,67 @@ export default function Home() {
     setLoading(true)
     setError(null)
     const cached = getCachedCatalog()
-    if (cached && cached.length) {
-      setSongs(cached)
-      setFeatured(pickFeatured(cached))
-      setLoading(false)
-    }
+    if (cached && cached.length) { setSongs(cached); setLoading(false) }
     const { songs, offline } = await loadCatalog()
     setOffline(offline)
-    if (songs.length) {
-      setSongs(songs)
-      setFeatured(pickFeatured(songs))
-    } else if (!cached?.length) {
-      setError('Could not load songs. Connect to the internet once to download them.')
-    }
+    if (songs.length) setSongs(songs)
+    else if (!cached?.length) setError('Could not load songs. Connect to the internet once to download them.')
     setLoading(false)
   }
 
-  function pickFeatured(list) {
-    // Pick a random song each session — rotate daily using day-of-year as seed
-    const day = Math.floor(Date.now() / 86400000)
-    return list[day % list.length] || list[0]
+  const day = Math.floor(Date.now() / 86400000)
+
+  // Featured carousel — a few deterministic daily picks (prefers verified/free)
+  const featured = (() => {
+    if (!songs.length) return []
+    const pool = songs.filter(s => s.verified || s.free)
+    const base = pool.length >= 4 ? pool : songs
+    const picks = []
+    for (let i = 0; i < 4 && i < base.length; i++) picks.push(base[(day * 3 + i * 37) % base.length])
+    return picks.filter((s, i, a) => a.findIndex(x => x.id === s.id) === i)
+  })()
+
+  // Category tiles with counts
+  const categories = (() => {
+    const map = new Map()
+    songs.forEach(s => { if (s.category) map.set(s.category, (map.get(s.category) || 0) + 1) })
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+  })()
+
+  // Recently played (resolve ids → songs)
+  const recentSongs = recent.map(id => songs.find(s => s.id === id)).filter(Boolean).slice(0, 6)
+
+  // Discover — a daily-rotating slice of the catalogue
+  const discover = (() => {
+    if (!songs.length) return []
+    const start = (day * 7) % songs.length
+    return Array.from({ length: Math.min(8, songs.length) }, (_, i) => songs[(start + i) % songs.length])
+  })()
+
+  function onHeroScroll() {
+    const el = heroRef.current
+    if (!el) return
+    setHeroIndex(Math.round(el.scrollLeft / el.clientWidth))
   }
-
-  const categories = ['All', ...Array.from(new Set(songs.map(s => s.category).filter(Boolean))).sort()]
-
-  const filtered = songs.filter(s => {
-    const matchQuery = !query ||
-      s.title?.toLowerCase().includes(query.toLowerCase()) ||
-      s.artist?.toLowerCase().includes(query.toLowerCase()) ||
-      s.composer?.toLowerCase().includes(query.toLowerCase())
-    const matchCat = activeCategory === 'All' || s.category === activeCategory
-    return matchQuery && matchCat
-  })
-
-  function handleSong(song) {
-    if (canAccess(song, isMember)) { nav(`/song/${song.id}`); return }
-    if (!user) { setShowLogin(true); return }
-    setShowSubscribe(true)
-  }
-
-  function clearSearch() {
-    setQuery('')
-    searchRef.current?.focus()
-  }
-
-  const isSearching = query.length > 0
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div style={{ paddingBottom: 96 }}>
       {/* Header */}
-      <div style={{ padding: '52px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '50px 20px 18px' }}>
         <div>
-          <p style={{ color: 'var(--text2)', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 3 }}>BULA VINAKA</p>
-          <h1 className="font-playfair" style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em' }}>Sigidrigi</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 11, letterSpacing: '0.08em' }}>Bula vinaka</p>
+          <h1 className="font-playfair" style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', marginTop: 2 }}>Sigidrigi</h1>
         </div>
-        <button onClick={() => user ? nav('/account') : setShowLogin(true)}
-          style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 15, fontFamily: 'Playfair Display, serif' }}>
-          {user ? user.email?.[0]?.toUpperCase() : 'S'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => nav('/browse')} aria-label="Search"
+            style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)' }}>
+            <Search size={18} />
+          </button>
+          <button onClick={() => user ? nav('/account') : setShowLogin(true)}
+            style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 16, fontFamily: 'Playfair Display, serif' }}>
+            {user ? user.email?.[0]?.toUpperCase() : 'S'}
+          </button>
+        </div>
       </div>
 
       {/* Banners */}
@@ -113,138 +122,112 @@ export default function Home() {
         </div>
       )}
 
-      {/* Featured hero — hidden while searching */}
-      {featured && !isSearching && (
-        <div style={{ margin: '0 20px 20px', borderRadius: 22, background: 'linear-gradient(150deg,#0c2b22,#0A0A0A)', border: '1px solid rgba(0,229,160,0.18)', padding: 20, position: 'relative', overflow: 'hidden' }}
-          className="tapa-accent">
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-            <span style={{ background: 'rgba(0,229,160,0.15)', color: 'var(--accent)', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', padding: '4px 8px', borderRadius: 999 }}>FEATURED</span>
-            {featured.verified && (
-              <span style={{ background: 'rgba(0,229,160,0.1)', color: 'var(--accent)', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '4px 8px', borderRadius: 999 }}>✓ VERIFIED</span>
-            )}
-          </div>
-          <h2 className="font-playfair" style={{ fontSize: 38, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6 }}>
-            {featured.title}
-          </h2>
-          <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 18 }}>
-            {featured.category} · {featured.artist || 'Traditional'}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <button onClick={() => handleSong(featured)}
-              style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', flexShrink: 0 }}>
-              <Play size={22} color="#000" fill="#000" />
-            </button>
-            <div>
-              <button onClick={() => nav(`/sing/${featured.id}`)}
-                style={{ background: 'none', border: 'none', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: 0 }}>
-                Enter Sing Mode
-                <Equalizer />
-              </button>
-              <p style={{ color: 'var(--text3)', fontSize: 12, marginTop: 3 }}>BPM auto-scroll</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search */}
-      <div style={{ padding: '0 20px', marginBottom: 14 }}>
-        <div style={{ background: 'var(--bg2)', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px' }}>
-          <Search size={16} color="var(--text3)" />
-          <input ref={searchRef} value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="Search songs, artists…"
-            style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 14, flex: 1, fontFamily: 'Inter, sans-serif' }} />
-          {query && (
-            <button onClick={clearSearch} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex', padding: 0 }}>
-              <X size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Category chips — hidden while searching */}
-      {!isSearching && songs.length > 0 && (
-        <div style={{ padding: '0 20px', marginBottom: 18, overflowX: 'auto', display: 'flex', gap: 8, scrollbarWidth: 'none' }}>
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)}
-              style={{
-                flexShrink: 0, background: activeCategory === cat ? 'var(--accent)' : 'var(--bg2)',
-                border: 'none', borderRadius: 999, color: activeCategory === cat ? '#000' : 'var(--text2)',
-                fontWeight: 700, fontSize: 12, padding: '7px 14px', cursor: 'pointer',
-                letterSpacing: '0.04em', whiteSpace: 'nowrap',
-                transition: 'background 0.15s, color 0.15s'
-              }}>
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
       {loading && <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40 }}>Loading songs…</div>}
       {error && (
-        <div style={{ margin: '0 20px', background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 12, padding: 16, color: 'var(--danger)', fontSize: 14 }}>
-          {error}
-        </div>
+        <div style={{ margin: '0 20px', background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 12, padding: 16, color: 'var(--danger)', fontSize: 14 }}>{error}</div>
       )}
 
-      {!loading && !error && (
+      {!loading && !error && songs.length > 0 && (
         <>
-          {/* Song count header */}
-          <div style={{ padding: '0 20px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', textTransform: 'uppercase' }}>
-              {isSearching ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''}` : activeCategory === 'All' ? `Archive · ${songs.length} songs` : activeCategory}
-            </h3>
-            {activeCategory !== 'All' && !isSearching && (
-              <button onClick={() => setActiveCategory('All')}
-                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <X size={12} /> Clear
-              </button>
-            )}
-          </div>
-
-          {/* Song list */}
-          <div style={{ padding: '0 20px', marginBottom: 24 }}>
-            {filtered.length === 0 && (
-              <p style={{ color: 'var(--text3)', fontSize: 14, paddingTop: 8 }}>No songs found.</p>
-            )}
-            {filtered.map(song => {
-              const accessible = canAccess(song, isMember)
-              return (
-                <button key={song.id} onClick={() => handleSong(song)}
-                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span className="font-playfair" style={{ color: accessible ? 'var(--accent)' : 'rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 700 }}>{song.title?.[0]}</span>
+          {/* Hero carousel */}
+          <div ref={heroRef} onScroll={onHeroScroll}
+            style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', gap: 0, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+            {featured.map((s, i) => (
+              <div key={s.id} style={{ flex: '0 0 100%', scrollSnapAlign: 'center', padding: '0 20px' }}>
+                <CardImage song={s} radius={24} overlay="full" style={{ height: 250 }}>
+                  <div onClick={() => nav(`/song/${s.id}`)} style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', cursor: 'pointer' }}>
+                    <span style={{ alignSelf: 'flex-start', background: 'rgba(0,229,160,0.9)', color: '#04342C', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', padding: '4px 9px', borderRadius: 999, marginBottom: 12 }}>
+                      {i === 0 ? 'TODAY’S FEATURED' : 'FEATURED'}
+                    </span>
+                    <h2 className="font-playfair" style={{ fontSize: 38, fontWeight: 800, lineHeight: 1.02, letterSpacing: '-0.02em', marginBottom: 6 }}>{s.title}</h2>
+                    <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginBottom: 16 }}>{s.category || 'Traditional'} · {s.artist || 'Traditional'}</p>
+                    <button onClick={e => { e.stopPropagation(); nav(`/sing/${s.id}`) }}
+                      style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 9, background: 'var(--accent)', border: 'none', borderRadius: 999, color: '#000', fontWeight: 700, fontSize: 14, padding: '11px 20px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.35)' }}>
+                      <Play size={16} fill="#000" /> Sing now
+                    </button>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</p>
-                    <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>{song.category}{song.artist ? ` · ${song.artist}` : ''}</p>
-                  </div>
-                  {!accessible && LOCK_CONTENT && <Lock size={14} color="var(--gold)" style={{ flexShrink: 0 }} />}
-                  {song.instrumental_url && accessible && (
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--accent)', border: '1px solid rgba(0,229,160,0.3)', borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>♪</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Premium banner — only show when not a member */}
-          {!isMember && (
-            <div style={{ margin: '0 20px 24px', background: 'rgba(255,184,0,0.06)', border: '1px solid rgba(255,184,0,0.2)', borderRadius: 18, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <Star size={22} color="var(--gold)" style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 700, fontSize: 15 }}>Join the archive — $5/mo</p>
-                <p style={{ color: 'var(--text2)', fontSize: 12, marginTop: 2 }}>Support Fijian music preservation</p>
+                </CardImage>
               </div>
-              <button onClick={() => setShowSubscribe(true)}
-                style={{ background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, fontSize: 13, padding: '8px 16px', cursor: 'pointer', flexShrink: 0 }}>
-                Join
-              </button>
+            ))}
+          </div>
+          {/* Dots */}
+          {featured.length > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12 }}>
+              {featured.map((_, i) => (
+                <span key={i} style={{ width: i === heroIndex ? 18 : 6, height: 6, borderRadius: 999, background: i === heroIndex ? 'var(--accent)' : 'var(--bg3)', transition: 'width 0.2s' }} />
+              ))}
             </div>
           )}
+
+          {/* Search bar */}
+          <div style={{ padding: '20px 20px 6px' }}>
+            <button onClick={() => nav('/browse')}
+              style={{ width: '100%', background: 'var(--bg2)', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', border: 'none', cursor: 'pointer' }}>
+              <Search size={16} color="var(--text3)" />
+              <span style={{ color: 'var(--text3)', fontSize: 14, flex: 1, textAlign: 'left' }}>Search songs, artists, or lyrics…</span>
+              <SlidersHorizontal size={16} color="var(--accent)" />
+            </button>
+          </div>
+
+          {/* Recently played */}
+          {recentSongs.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 12px' }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700 }}>Recently played</h3>
+              </div>
+              <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px 4px', scrollbarWidth: 'none' }}>
+                {recentSongs.map(s => (
+                  <div key={s.id} onClick={() => nav(`/song/${s.id}`)} style={{ flexShrink: 0, width: 150, cursor: 'pointer' }}>
+                    <CardImage song={s} radius={16} overlay="bottom" style={{ height: 96 }}>
+                      <div style={{ position: 'absolute', right: 10, bottom: 10, width: 34, height: 34, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Play size={15} color="#000" fill="#000" />
+                      </div>
+                    </CardImage>
+                    <p style={{ fontWeight: 600, fontSize: 13.5, marginTop: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</p>
+                    <p style={{ fontSize: 11.5, color: 'var(--accent)' }}>{s.category || 'Traditional'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Browse categories */}
+          {categories.length > 0 && (
+            <div style={{ marginTop: 26 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, padding: '0 20px 12px' }}>Browse categories</h3>
+              <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px 4px', scrollbarWidth: 'none' }}>
+                {categories.map(({ name, count }) => {
+                  const { color, Icon } = categoryStyle(name)
+                  return (
+                    <button key={name} onClick={() => nav(`/browse?category=${encodeURIComponent(name)}`)}
+                      style={{ flexShrink: 0, width: 118, height: 118, borderRadius: 18, border: `1px solid ${color}40`, background: `linear-gradient(160deg, ${color}26, ${color}0d)`, cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 14, textAlign: 'left' }}>
+                      <Icon size={26} color={color} />
+                      <div>
+                        <p style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</p>
+                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{count} song{count !== 1 ? 's' : ''}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Discover */}
+          <div style={{ marginTop: 26, padding: '0 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Discover</h3>
+              <button onClick={() => nav('/browse')} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
+                See all <ChevronRight size={15} />
+              </button>
+            </div>
+            {discover.map(s => (
+              <SongRow key={s.id} song={s} isMember={isMember} onClick={() => nav(`/song/${s.id}`)} />
+            ))}
+          </div>
         </>
       )}
 
-      {showSubscribe && <SubscribeSheet onClose={() => setShowSubscribe(false)} />}
       {showLogin && <LoginSheet onClose={() => setShowLogin(false)} />}
     </div>
   )

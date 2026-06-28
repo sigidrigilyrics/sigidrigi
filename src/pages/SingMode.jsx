@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music } from 'lucide-react'
 import { loadSong, findCachedSong } from '../lib/songs'
+import { pushRecent } from '../lib/recent'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
 
 export default function SingMode() {
@@ -32,6 +33,7 @@ export default function SingMode() {
   const useYouTube = !!ytId
 
   useEffect(() => {
+    pushRecent(id)
     async function load() {
       const cached = findCachedSong(id)
       if (cached) { setSong(cached); if (cached.bpm) setBpm(cached.bpm); setLoading(false) }

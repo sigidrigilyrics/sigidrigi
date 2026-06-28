@@ -11,10 +11,10 @@ export const MEMBERSHIP_PRICE = 5 // FJD / month
 // Payment instructions shown on the Subscribe screen.
 // ⚠️ FILL THESE IN with your real details before launch.
 export const PAYMENT_DETAILS = {
-  MPaisa: '<your MPaisa number>',
-  MyCash: '<your MyCash number>',
-  PayPal: '<your PayPal email or link>',
-  Bank: '<your bank name, account name & number>',
+  MPaisa: '679 244 0483',
+  MyCash: '679 740 9712',
+  PayPal: 'paypal.me/yourname',
+  Bank: 'BSP, Sigidrigi Lyrics, 1234567',
 }
 
 // Reference code e.g. SGD-DIU-4821 — the user quotes this with their payment.
