@@ -1,6 +1,6 @@
 import { Heart, Music, Lock } from 'lucide-react'
 import { useFavorites } from '../lib/favorites'
-import { canAccess, LOCK_CONTENT } from '../lib/membership'
+import { canAccess, isFreeThisWeek, LOCK_CONTENT } from '../lib/membership'
 import CardImage from './CardImage'
 
 // One song in a list — photo thumbnail + title + category, with a music badge
@@ -22,6 +22,9 @@ export default function SongRow({ song, isMember = false, onClick }) {
           {song.instrumental_url && <Music size={12} color="var(--accent)" />}
         </p>
       </div>
+      {isFreeThisWeek(song) && (
+        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--accent)', border: '1px solid rgba(0,229,160,0.4)', borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>FREE</span>
+      )}
       {locked && <Lock size={15} color="var(--gold)" style={{ flexShrink: 0 }} />}
       <button onClick={e => { e.stopPropagation(); toggle(song.id) }}
         aria-label={fav ? 'Remove favorite' : 'Add favorite'}

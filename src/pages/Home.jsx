@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Play, WifiOff, ChevronRight, SlidersHorizontal,
+import { Search, Play, WifiOff, ChevronRight, SlidersHorizontal, Gift,
   Heart, Church, Users, Baby, Landmark, Sparkles, Music, BookOpen, Sunrise, Waves } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { loadCatalog, getCachedCatalog } from '../lib/songs'
-import { useMembership } from '../lib/membership'
+import { useMembership, isFreeThisWeek } from '../lib/membership'
 import { useRecent } from '../lib/recent'
 import CardImage from '../components/CardImage'
 import SongRow from '../components/SongRow'
@@ -56,6 +56,7 @@ export default function Home() {
   }
 
   const day = Math.floor(Date.now() / 86400000)
+  const freeCount = songs.filter(s => isFreeThisWeek(s)).length
 
   // Featured carousel — a few deterministic daily picks (prefers verified/free)
   const featured = (() => {
@@ -196,6 +197,17 @@ export default function Home() {
             <div style={{ marginTop: 26 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, padding: '0 20px 12px' }}>Browse categories</h3>
               <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px 4px', scrollbarWidth: 'none' }}>
+                {/* Free-to-sing tile always first */}
+                {freeCount > 0 && (
+                  <button onClick={() => nav('/browse?free=1')}
+                    style={{ flexShrink: 0, width: 118, height: 118, borderRadius: 18, border: '1px solid rgba(0,229,160,0.45)', background: 'linear-gradient(160deg, rgba(0,229,160,0.22), rgba(0,229,160,0.06))', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 14, textAlign: 'left' }}>
+                    <Gift size={26} color="var(--accent)" />
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)' }}>Free to sing</p>
+                      <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{freeCount} this week</p>
+                    </div>
+                  </button>
+                )}
                 {categories.map(({ name, count }) => {
                   const { color, Icon } = categoryStyle(name)
                   return (

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, X, ChevronLeft, Mic2 } from 'lucide-react'
+import { Search, X, ChevronLeft, Mic2, Gift } from 'lucide-react'
 import { loadCatalog, getCachedCatalog } from '../lib/songs'
-import { useMembership } from '../lib/membership'
+import { useMembership, isFreeThisWeek } from '../lib/membership'
 import SongRow from '../components/SongRow'
 
 // Unified browse/search — search box + category chips + filtered list.
@@ -13,6 +13,7 @@ export default function Browse() {
   const [songs, setSongs] = useState(() => getCachedCatalog() || [])
   const [query, setQuery] = useState(params.get('q') || '')
   const [category, setCategory] = useState(params.get('category') || 'All')
+  const [freeOnly, setFreeOnly] = useState(params.get('free') === '1')
   const { isMember } = useMembership()
   const inputRef = useRef(null)
 
@@ -24,8 +25,9 @@ export default function Browse() {
     const next = {}
     if (query) next.q = query
     if (category !== 'All') next.category = category
+    if (freeOnly) next.free = '1'
     setParams(next, { replace: true })
-  }, [query, category])
+  }, [query, category, freeOnly])
 
   const categories = ['All', ...Array.from(new Set(songs.map(s => s.category).filter(Boolean))).sort()]
 
@@ -33,7 +35,8 @@ export default function Browse() {
     const q = query.toLowerCase()
     const matchQuery = !q || s.title?.toLowerCase().includes(q) || s.artist?.toLowerCase().includes(q) || s.composer?.toLowerCase().includes(q)
     const matchCat = category === 'All' || s.category === category
-    return matchQuery && matchCat
+    const matchFree = !freeOnly || isFreeThisWeek(s)
+    return matchQuery && matchCat && matchFree
   })
 
   return (
@@ -74,6 +77,10 @@ export default function Browse() {
 
       {/* Category chips */}
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 16px', scrollbarWidth: 'none' }}>
+        <button onClick={() => setFreeOnly(f => !f)}
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, background: freeOnly ? 'var(--accent)' : 'var(--bg2)', border: '1px solid rgba(0,229,160,0.4)', borderRadius: 999, color: freeOnly ? '#000' : 'var(--accent)', fontWeight: 700, fontSize: 12, padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <Gift size={13} /> Free this week
+        </button>
         {categories.map(cat => (
           <button key={cat} onClick={() => setCategory(cat)}
             style={{ flexShrink: 0, background: category === cat ? 'var(--accent)' : 'var(--bg2)', border: 'none', borderRadius: 999, color: category === cat ? '#000' : 'var(--text2)', fontWeight: 700, fontSize: 12, padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }}>

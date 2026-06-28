@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isConfigured } from './supabase'
+import { getCachedCatalog } from './songs'
 
 // ── Master paywall flag ──────────────────────────────────────────────
 // While false, EVERY song stays open (testing / content-loading phase).
@@ -29,10 +30,57 @@ export function isActiveMember(member) {
   return !!member && member.status === 'active' && !!member.expires_at && new Date(member.expires_at) > new Date()
 }
 
+// ── Weekly free rotation ─────────────────────────────────────────────
+// Exactly FREE_PER_WEEK songs are free each week. We rank the whole catalogue
+// by a week-seeded hash and take the top N — deterministic, identical for
+// everyone, rotates automatically every week, needs no DB writes, works
+// offline. (The DB `free` flag is ignored on purpose — every song is currently
+// flagged free for testing, which would defeat the rotation. Pin a song as
+// always-free later with `always_free: true`.)
+export const FREE_PER_WEEK = 50
+
+function hash(str) {
+  let h = 5381
+  const s = String(str || '')
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0
+  return h
+}
+
+// Current week index (UTC). Changes once every 7 days.
+export function weekNumber() {
+  return Math.floor(Date.now() / (7 * 86400000))
+}
+
+// Memoised set of this week's free song ids (recomputed when the week changes
+// or the catalogue size changes). Never cached while the catalogue is empty.
+let _freeCache = { week: null, len: 0, ids: null }
+function freeSetForWeek() {
+  const wk = weekNumber()
+  const cat = getCachedCatalog() || []
+  if (_freeCache.week === wk && _freeCache.len === cat.length && _freeCache.ids) return _freeCache.ids
+  if (!cat.length) return new Set()
+  const ids = new Set(
+    cat
+      .map(s => ({ id: String(s.id), h: hash(`${s.id}:${wk}`) }))
+      .sort((a, b) => a.h - b.h)
+      .slice(0, FREE_PER_WEEK)
+      .map(r => r.id)
+  )
+  _freeCache = { week: wk, len: cat.length, ids }
+  return ids
+}
+
+// Is this song free during the current week?
+export function isFreeThisWeek(song) {
+  if (!song) return false
+  if (song.always_free) return true // optional pin
+  return freeSetForWeek().has(String(song.id))
+}
+
 // Whether a song is accessible to the current user.
 // While LOCK_CONTENT is false this is always true (nothing is gated yet).
 export function canAccess(song, isMember) {
-  return !LOCK_CONTENT || isMember || !!(song && song.free)
+  return !LOCK_CONTENT || isMember || isFreeThisWeek(song)
 }
 
 // Loads the current auth user + their members row; recomputes on auth changes.
