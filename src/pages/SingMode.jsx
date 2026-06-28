@@ -189,6 +189,24 @@ export default function SingMode() {
     }
   }
 
+  // Nudge the song forward/back by a few seconds (the RAF loop re-derives the
+  // scroll position from the time source, so the lyrics follow automatically).
+  function handleSkip(seconds) {
+    if (useYouTube && ytPlayerRef.current) {
+      try {
+        const t = Math.max(0, (ytPlayerRef.current.getCurrentTime() || 0) + seconds)
+        ytPlayerRef.current.seekTo(t)
+      } catch { /* not ready */ }
+    } else if (audioRef.current && audioRef.current.src) {
+      audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime + seconds)
+    } else if (playStartRef.current) {
+      // BPM-only mode: shifting the start time changes elapsed time
+      scrollStartedRef.current = true
+      setScrollStarted(true)
+      playStartRef.current -= seconds * 1000
+    }
+  }
+
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
   if (error) return <div style={{ padding: 20, background: '#070707', color: 'var(--danger)', height: '100vh' }}>{error}</div>
   if (!song) return null
@@ -318,7 +336,7 @@ export default function SingMode() {
 
         {/* Transport */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
-          <button onClick={handleRestart}
+          <button onClick={handleRestart} aria-label="Restart"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}>
             <SkipBack size={24} />
           </button>
@@ -326,7 +344,8 @@ export default function SingMode() {
             style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 28px rgba(0,229,160,0.4)' }}>
             {isPlaying ? <Pause size={26} color="#000" /> : <Play size={26} color="#000" fill="#000" />}
           </button>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}>
+          <button onClick={() => handleSkip(10)} aria-label="Skip forward 10 seconds"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}>
             <SkipForward size={24} />
           </button>
         </div>

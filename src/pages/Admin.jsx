@@ -99,7 +99,7 @@ function AudioUploader({ value, onChange, onBpmDetecting, onBpmDetected }) {
 }
 
 function SongFormSheet({ song, onClose, onSaved }) {
-  const [form, setForm] = useState(song || { title: '', artist: '', composer: '', category: '', lyrics: '', bpm: '', intro: '', province: '', source: '', reference_url: '', instrumental_url: '', free: false, verified: false, audio_url: '', audio_url_full: '' })
+  const [form, setForm] = useState(song || { title: '', artist: '', composer: '', category: '', lyrics: '', bpm: '', intro: '', province: '', source: '', reference_url: '', instrumental_url: '', free: false, verified: false, audio_url: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [bpmDetecting, setBpmDetecting] = useState(false)
