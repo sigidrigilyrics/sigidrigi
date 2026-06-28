@@ -177,6 +177,35 @@ export default function Song() {
         )
       })()}
 
+      {/* Artist social link */}
+      {song.social_url && (() => {
+        const url = song.social_url
+        const lower = url.toLowerCase()
+        const platform = lower.includes('instagram') ? 'Instagram'
+          : lower.includes('facebook') || lower.includes('fb.com') ? 'Facebook'
+          : lower.includes('tiktok') ? 'TikTok'
+          : lower.includes('twitter') || lower.includes('x.com') ? 'X (Twitter)'
+          : lower.includes('youtube') ? 'YouTube'
+          : 'Social'
+        const color = platform === 'Instagram' ? '#e1306c'
+          : platform === 'Facebook' ? '#1877f2'
+          : platform === 'TikTok' ? '#69c9d0'
+          : platform === 'X (Twitter)' ? '#fff'
+          : platform === 'YouTube' ? '#ff0000'
+          : 'var(--accent)'
+        const bg = `${color}18`
+        const border = `${color}55`
+        return (
+          <div style={{ margin: '0 20px 20px' }}>
+            <a href={url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', background: bg, border: `1.5px solid ${border}`, borderRadius: 14, color, fontWeight: 700, fontSize: 14, padding: '13px', textDecoration: 'none' }}>
+              <ExternalLink size={18} />
+              Follow {song.artist || 'Artist'} on {platform}
+            </a>
+          </div>
+        )
+      })()}
+
       {/* Lyrics */}
       <div style={{ padding: '0 20px' }}>
         {canAccess(song, isMember) ? (
