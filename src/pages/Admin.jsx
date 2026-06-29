@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera, Users, UserPlus, UserMinus } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera, Users, UserPlus, UserMinus, LogOut } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
 import { isActiveMember } from '../lib/membership'
@@ -376,6 +376,12 @@ export default function Admin() {
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          {isEditor && (
+            <button onClick={async () => { await supabase.auth.signOut(); nav('/') }} title="Sign out"
+              style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg2)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <LogOut size={18} color="var(--text2)" />
+            </button>
+          )}
           <button onClick={() => nav('/upload')} title="Photograph a songbook page"
             style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg2)', border: '1px solid var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Camera size={18} color="var(--accent)" />
