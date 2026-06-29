@@ -235,12 +235,14 @@ export default function Admin() {
   const [deleteId, setDeleteId] = useState(null)
   const [tab, setTab] = useState('songs')
   const [memberFilter, setMemberFilter] = useState('pending')
+  const [loggedInUser, setLoggedInUser] = useState(null)
 
   // Auto-unlock if logged-in user is a registered editor/admin
   useEffect(() => {
     async function checkRole() {
       if (!isConfigured) return
       const { data: { user } } = await supabase.auth.getUser()
+      setLoggedInUser(user || null)
       if (!user?.email) return
       const { data } = await supabase.from('admins').select('role,name').eq('email', user.email).single()
       if (data?.role === 'editor' || data?.role === 'admin') {
@@ -322,9 +324,19 @@ export default function Admin() {
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 15, padding: '14px', cursor: 'pointer' }}>
             Enter
           </button>
-          <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
-            Editors: sign in via the Profile tab first, then return here for automatic access.
-          </p>
+          {!loggedInUser && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 16px' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                <span style={{ fontSize: 12, color: 'var(--text3)' }}>or</span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              </div>
+              <button onClick={() => nav('/account')}
+                style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontWeight: 600, fontSize: 15, padding: '14px', cursor: 'pointer' }}>
+                Sign in as Editor
+              </button>
+            </>
+          )}
         </div>
       </div>
     )
