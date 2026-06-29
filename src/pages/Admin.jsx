@@ -220,6 +220,8 @@ function MembersPanel({ members, filter, setFilter, onActivate, onRenew, onDeact
 export default function Admin() {
   const nav = useNavigate()
   const [unlocked, setUnlocked] = useState(false)
+  const [isEditor, setIsEditor] = useState(false)
+  const [editorName, setEditorName] = useState('')
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
   const [songs, setSongs] = useState([])
@@ -233,8 +235,25 @@ export default function Admin() {
   const [tab, setTab] = useState('songs')
   const [memberFilter, setMemberFilter] = useState('pending')
 
+  // Auto-unlock if logged-in user is a registered editor/admin
+  useEffect(() => {
+    async function checkRole() {
+      if (!isConfigured) return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) return
+      const { data } = await supabase.from('admins').select('role,name').eq('email', user.email).single()
+      if (data?.role === 'editor' || data?.role === 'admin') {
+        setIsEditor(data.role === 'editor')
+        setEditorName(data.name || user.email)
+        setUnlocked(true)
+        loadData()
+      }
+    }
+    checkRole()
+  }, [])
+
   function unlock() {
-    if (pw === ADMIN_PASSWORD) { setUnlocked(true); loadData() }
+    if (pw === ADMIN_PASSWORD) { setUnlocked(true); setIsEditor(false); loadData() }
     else setPwError(true)
   }
 
@@ -301,6 +320,9 @@ export default function Admin() {
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 15, padding: '14px', cursor: 'pointer' }}>
             Enter
           </button>
+          <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
+            Editors: sign in via the Profile tab first, then return here for automatic access.
+          </p>
         </div>
       </div>
     )
@@ -311,7 +333,9 @@ export default function Admin() {
       {/* Header */}
       <div style={{ padding: '52px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 4 }}>ADMIN</p>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 4 }}>
+            {isEditor ? `EDITOR — ${editorName}` : 'ADMIN'}
+          </p>
           <h1 className="font-playfair" style={{ fontSize: 28, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
             Manage songs <Lock size={16} color="var(--accent)" />
           </h1>
@@ -330,7 +354,7 @@ export default function Admin() {
 
       {/* Tab toggle */}
       <div style={{ display: 'flex', gap: 8, padding: '0 20px', marginBottom: 18 }}>
-        {[['songs', 'Songs'], ['members', 'Members']].map(([id, label]) => (
+        {[['songs', 'Songs'], ...(!isEditor ? [['members', 'Members']] : [])].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             style={{ flex: 1, background: tab === id ? 'rgba(0,229,160,0.1)' : 'var(--bg2)', border: tab === id ? '1.5px solid var(--accent)' : '1.5px solid transparent', borderRadius: 10, color: tab === id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 13, padding: '9px', cursor: 'pointer' }}>
             {label}
