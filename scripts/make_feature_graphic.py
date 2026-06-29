@@ -1,6 +1,7 @@
 """Google Play feature graphic — 1024x500.
-On-brand: dark base, a Pacific photo fading in from the right, Sigidrigi
-wordmark + tagline on the left. Run: python scripts/make_feature_graphic.py
+Uses the Sigidrigi icon artwork (guitar/sunset) on the right,
+dark gradient left side for text.
+Run: python scripts/make_feature_graphic.py
 """
 import os
 from PIL import Image, ImageDraw, ImageFont
@@ -9,63 +10,56 @@ W, H = 1024, 500
 ACCENT = (0, 229, 160)
 DARK = (10, 10, 10)
 
-base = Image.new('RGB', (W, H), DARK)
+SRC = r"C:\Users\digit\OneDrive\Desktop\Template Doc\Abuild dcreens\Sigidrigi App\pics\icon.png"
 
-# Right-side photo (palm beach), scaled to cover, then darkened with a
-# left-to-right gradient so the left stays solid for text.
-photo_path = os.path.join(os.path.dirname(__file__), '..', 'public', 'images', 'cards', 'card3.jpg')
-try:
-    photo = Image.open(photo_path).convert('RGB')
-    # cover-fit to WxH
-    pr, br = photo.width / photo.height, W / H
-    if pr > br:
-        nh = H; nw = int(H * pr)
+base = Image.new("RGB", (W, H), DARK)
+
+# Load source artwork — scale to fill height, anchor right
+photo = Image.open(SRC).convert("RGB")
+scale = H / photo.height
+new_w = int(photo.width * scale)
+photo = photo.resize((new_w, H), Image.LANCZOS)
+# Paste flush to the right edge
+paste_x = W - new_w
+base.paste(photo, (paste_x, 0))
+
+# Gradient overlay: fully dark on left, fades to transparent on right
+grad = Image.new("L", (W, 1), 0)
+for x in range(W):
+    if x < 420:
+        a = 255
+    elif x < 650:
+        a = int(255 - (x - 420) / 230 * 220)
     else:
-        nw = W; nh = int(W / pr)
-    photo = photo.resize((nw, nh)).crop((0, 0, W, H))
-    base.paste(photo, (0, 0))
-
-    # Dark gradient: fully dark on the left, ~25% on the far right.
-    grad = Image.new('L', (W, 1), 0)
-    for x in range(W):
-        t = x / W
-        a = int(252 - t * (252 - 70))      # 252 → 70
-        if x < 430:                         # keep the text zone solid
-            a = 248
-        grad.putpixel((x, 0), a)
-    grad = grad.resize((W, H))
-    overlay = Image.new('RGB', (W, H), DARK)
-    base = Image.composite(overlay, base, grad)
-except FileNotFoundError:
-    pass
+        a = max(int(35 - (x - 650) / (W - 650) * 20), 15)
+    grad.putpixel((x, 0), a)
+grad = grad.resize((W, H))
+overlay = Image.new("RGB", (W, H), DARK)
+base = Image.composite(overlay, base, grad)
 
 d = ImageDraw.Draw(base)
 
-def font(path, size):
-    for p in [path, os.path.join('C:\\Windows\\Fonts', path)]:
+def font(name, size):
+    for path in [name, os.path.join("C:\\Windows\\Fonts", name)]:
         try:
-            return ImageFont.truetype(p, size)
+            return ImageFont.truetype(path, size)
         except OSError:
             continue
     return ImageFont.load_default()
 
-title_font = font('georgiab.ttf', 110)
-tag_font = font('segoeuib.ttf', 36)
-sub_font = font('segoeui.ttf', 27)
+f_kicker = font("segoeuib.ttf", 22)
+f_title  = font("georgiab.ttf", 108)
+f_tag    = font("segoeuib.ttf", 34)
+f_sub    = font("segoeui.ttf",  24)
 
-PAD = 64
-# small uppercase kicker
-d.text((PAD, 150), 'THE FIJIAN SONGBOOK', font=sub_font, fill=ACCENT)
-# wordmark
-d.text((PAD, 188), 'Sigidrigi', font=title_font, fill=(245, 245, 245))
-# tagline
-d.text((PAD, 322), 'Sing along, offline', font=tag_font, fill=(245, 245, 245))
-d.text((PAD, 372), 'Lyrics  ·  Sing Mode  ·  199+ songs', font=sub_font, fill=(180, 180, 180))
-# teal accent underline
-d.rectangle([PAD, 305, PAD + 150, 309], fill=ACCENT)
+PAD, Y = 56, 130
 
-out_dir = os.path.join(os.path.dirname(__file__), '..', 'docs', 'store-assets')
-os.makedirs(out_dir, exist_ok=True)
-out = os.path.join(out_dir, 'feature-graphic.png')
+d.text((PAD, Y),         "THE FIJIAN SONGBOOK",          font=f_kicker, fill=ACCENT)
+d.text((PAD, Y + 34),    "Sigidrigi",                    font=f_title,  fill=(245, 245, 245))
+d.rectangle([PAD, Y + 155, PAD + 160, Y + 160],          fill=ACCENT)
+d.text((PAD, Y + 172),   "Sing along. Offline.",          font=f_tag,    fill=(245, 245, 245))
+d.text((PAD, Y + 222),   "Lyrics  ·  Sing Mode  ·  199+ songs", font=f_sub, fill=(180, 180, 180))
+
+out = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs", "store-assets", "feature-graphic.png"))
 base.save(out)
-print(f'Saved feature graphic: {os.path.abspath(out)} ({base.size[0]}x{base.size[1]})')
+print(f"Saved: {out} ({W}x{H})")
