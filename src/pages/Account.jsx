@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, ChevronRight, Heart, Star, Shield, Info, Music, FileText, Lock, Copyright } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { LogOut, ChevronRight, Heart, Star, Shield, Info, Music, FileText, Lock, Copyright, PenLine } from 'lucide-react'
+import { supabase, isConfigured } from '../lib/supabase'
 import { loadCatalog } from '../lib/songs'
 import { useFavorites } from '../lib/favorites'
 import { useMembership } from '../lib/membership'
@@ -16,10 +16,20 @@ export default function Account() {
   const [showLogin, setShowLogin] = useState(false)
   const [showSubscribe, setShowSubscribe] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const [editorRole, setEditorRole] = useState(null)
 
   useEffect(() => {
     loadCatalog().then(({ songs }) => setSongs(songs))
   }, [])
+
+  useEffect(() => {
+    async function checkEditorRole() {
+      if (!isConfigured || !user?.email) return
+      const { data } = await supabase.from('admins').select('role').eq('email', user.email).single()
+      if (data?.role) setEditorRole(data.role)
+    }
+    checkEditorRole()
+  }, [user])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -117,10 +127,26 @@ export default function Account() {
         )}
       </div>
 
+      {/* Editor — Manage Songs button */}
+      {editorRole === 'editor' && (
+        <div style={{ margin: '0 20px 16px' }}>
+          <button onClick={() => nav('/admin')}
+            style={{ width: '100%', background: 'rgba(0,229,160,0.08)', border: '1.5px solid var(--accent)', borderRadius: 16, padding: '16px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left' }}>
+            <PenLine size={22} color="var(--accent)" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>Manage Songs</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>Add, edit or update song lyrics</p>
+            </div>
+            <ChevronRight size={16} color="var(--accent)" />
+          </button>
+        </div>
+      )}
+
       {/* Menu */}
       <div style={{ padding: '0 20px' }}>
         {[
-          { label: 'Admin', icon: Shield, onClick: () => nav('/admin') },
+          ...(editorRole === 'admin' ? [{ label: 'Admin', icon: Shield, onClick: () => nav('/admin') }] : []),
+          ...(editorRole === null ? [{ label: 'Admin', icon: Shield, onClick: () => nav('/admin') }] : []),
           { label: 'About Sigidrigi', icon: Info, onClick: () => setShowAbout(true) },
           { label: 'Terms of Use', icon: FileText, onClick: () => nav('/terms') },
           { label: 'Privacy Policy', icon: Lock, onClick: () => nav('/privacy') },
