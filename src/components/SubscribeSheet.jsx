@@ -79,13 +79,29 @@ export default function SubscribeSheet({ onClose }) {
 
             {/* Payment instructions */}
             <div style={{ background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 12, padding: '14px', marginBottom: 16 }}>
-              <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7 }}>
-                Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>{method}</strong> to:
-              </p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{paymentDetails[method] || 'Loading…'}</p>
-              <p style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
-                Quote reference <strong>{refCode}</strong>, then message your receipt to <strong>sigidrigilyrics@gmail.com</strong>. We'll activate your account within 24 hours. 🌺
-              </p>
+              {method === 'Bank' ? (
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, marginBottom: 10 }}>
+                    Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>ANZ Bank Transfer</strong>. Message us on WhatsApp with your reference code and we'll send you the account details privately.
+                  </p>
+                  <a
+                    href={`https://wa.me/6792440483?text=Hi%20Sigidrigi!%20I%20want%20to%20subscribe.%20My%20reference%20code%20is%20${refCode}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#25d366', color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px', borderRadius: 10, textDecoration: 'none', marginBottom: 8 }}>
+                    WhatsApp us — {refCode}
+                  </a>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7 }}>
+                    Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>{method}</strong> to:
+                  </p>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{paymentDetails[method] || 'Loading…'}</p>
+                  <p style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
+                    Quote reference <strong>{refCode}</strong>, then message your receipt to <strong>sigidrigilyrics@gmail.com</strong>. We'll activate your account within 24 hours.
+                  </p>
+                </>
+              )}
             </div>
 
             <button onClick={onClose}
