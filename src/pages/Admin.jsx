@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera, Users, UserPlus, UserMinus } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
 import { isActiveMember } from '../lib/membership'
@@ -236,6 +236,10 @@ export default function Admin() {
   const [tab, setTab] = useState('songs')
   const [memberFilter, setMemberFilter] = useState('pending')
   const [loggedInUser, setLoggedInUser] = useState(null)
+  const [editors, setEditors] = useState([])
+  const [newEditorEmail, setNewEditorEmail] = useState('')
+  const [newEditorName, setNewEditorName] = useState('')
+  const [editorSaving, setEditorSaving] = useState(false)
 
   // Auto-unlock if logged-in user is a registered editor/admin
   useEffect(() => {
@@ -270,15 +274,32 @@ export default function Admin() {
       setLoading(false)
       return
     }
-    const [{ data: s }, { data: m }, { data: u }] = await Promise.all([
+    const [{ data: s }, { data: m }, { data: u }, { data: e }] = await Promise.all([
       supabase.from('songs').select('*').order('title'),
       supabase.from('members').select('*').order('subscribed_at', { ascending: false }),
       supabase.from('songs').select('id').eq('verified', false),
+      supabase.from('admins').select('*').order('name'),
     ])
     setSongs(s || [])
     setMembers(m || [])
     setUnverified(u || [])
+    setEditors(e || [])
     setLoading(false)
+  }
+
+  async function addEditor() {
+    if (!newEditorEmail.trim()) return
+    setEditorSaving(true)
+    await supabase.from('admins').upsert({ email: newEditorEmail.trim().toLowerCase(), role: 'editor', name: newEditorName.trim() || newEditorEmail.trim() })
+    setNewEditorEmail('')
+    setNewEditorName('')
+    setEditorSaving(false)
+    loadData()
+  }
+
+  async function removeEditor(email) {
+    await supabase.from('admins').delete().eq('email', email)
+    loadData()
   }
 
   async function handleDelete(id) {
@@ -368,7 +389,7 @@ export default function Admin() {
 
       {/* Tab toggle */}
       <div style={{ display: 'flex', gap: 8, padding: '0 20px', marginBottom: 18 }}>
-        {[['songs', 'Songs'], ...(!isEditor ? [['members', 'Members']] : [])].map(([id, label]) => (
+        {[['songs', 'Songs'], ...(!isEditor ? [['members', 'Members'], ['editors', 'Editors']] : [])].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             style={{ flex: 1, background: tab === id ? 'rgba(0,229,160,0.1)' : 'var(--bg2)', border: tab === id ? '1.5px solid var(--accent)' : '1.5px solid transparent', borderRadius: 10, color: tab === id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 13, padding: '9px', cursor: 'pointer' }}>
             {label}
@@ -434,6 +455,47 @@ export default function Admin() {
       {tab === 'members' && (
         <MembersPanel members={members} filter={memberFilter} setFilter={setMemberFilter}
           onActivate={activateMember} onRenew={renewMember} onDeactivate={deactivateMember} />
+      )}
+
+      {tab === 'editors' && (
+        <div style={{ padding: '0 20px' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', textTransform: 'uppercase', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Users size={12} color="var(--accent)" /> Team editors
+          </p>
+
+          {/* Add new editor */}
+          <div style={{ background: 'var(--bg1)', borderRadius: 14, padding: 16, marginBottom: 20 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Add editor</p>
+            <input value={newEditorName} onChange={e => setNewEditorName(e.target.value)} placeholder="Name (e.g. Salesi)"
+              style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, padding: '11px 13px', outline: 'none', marginBottom: 8, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
+            <input value={newEditorEmail} onChange={e => setNewEditorEmail(e.target.value)} placeholder="Email address"
+              type="email"
+              style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, padding: '11px 13px', outline: 'none', marginBottom: 10, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }} />
+            <button onClick={addEditor} disabled={editorSaving || !newEditorEmail.trim()}
+              style={{ width: '100%', background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, fontSize: 14, padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: !newEditorEmail.trim() ? 0.5 : 1 }}>
+              <UserPlus size={16} /> {editorSaving ? 'Adding…' : 'Add Editor'}
+            </button>
+          </div>
+
+          {/* Current editors */}
+          {editors.map(e => (
+            <div key={e.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', background: e.role === 'admin' ? 'rgba(0,229,160,0.15)' : 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="font-playfair" style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 16 }}>{(e.name || e.email)[0].toUpperCase()}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: 14 }}>{e.name || e.email}</p>
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{e.email} · {e.role}</p>
+              </div>
+              {e.role !== 'admin' && (
+                <button onClick={() => removeEditor(e.email)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 8 }}>
+                  <UserMinus size={18} color="var(--danger)" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Delete confirm */}
