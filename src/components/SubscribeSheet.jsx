@@ -1,15 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
-import { generateReferenceCode, PAYMENT_DETAILS, MEMBERSHIP_PRICE } from '../lib/membership'
+import { generateReferenceCode, loadPaymentDetails, MEMBERSHIP_PRICE } from '../lib/membership'
 
 export default function SubscribeSheet({ onClose }) {
   const [method, setMethod] = useState('MPaisa')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [refCode, setRefCode] = useState('')
+  const [paymentDetails, setPaymentDetails] = useState({})
 
-  const methods = ['MPaisa', 'MyCash', 'PayPal', 'Bank']
+  const methods = ['MPaisa', 'MyCash', 'Bank']
+
+  useEffect(() => {
+    loadPaymentDetails().then(setPaymentDetails)
+  }, [])
 
   async function handleSubscribe() {
     setLoading(true)
@@ -77,7 +82,7 @@ export default function SubscribeSheet({ onClose }) {
               <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7 }}>
                 Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>{method}</strong> to:
               </p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{PAYMENT_DETAILS[method]}</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{paymentDetails[method] || 'Loading…'}</p>
               <p style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
                 Quote reference <strong>{refCode}</strong>, then message your receipt to <strong>sigidrigilyrics@gmail.com</strong>. We'll activate your account within 24 hours. 🌺
               </p>

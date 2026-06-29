@@ -9,12 +9,16 @@ export const LOCK_CONTENT = false
 
 export const MEMBERSHIP_PRICE = 5 // FJD / month
 
-// Payment instructions shown on the Subscribe screen.
-// ⚠️ FILL THESE IN with your real details before launch.
-export const PAYMENT_DETAILS = {
-  MPaisa: '679 244 0483',
-  MyCash: '679 740 9712',
-  Bank: 'ANZ, Digitaki & Litia Tuberi, 12213358',
+// Payment details are stored in Supabase app_settings table (not in source code).
+// Keys: payment_MPaisa, payment_MyCash, payment_Bank
+export async function loadPaymentDetails() {
+  try {
+    const { data } = await supabase.from('app_settings').select('key,value').like('key', 'payment_%')
+    if (!data?.length) return {}
+    return Object.fromEntries(data.map(r => [r.key.replace('payment_', ''), r.value]))
+  } catch {
+    return {}
+  }
 }
 
 // Reference code e.g. SGD-DIU-4821 — the user quotes this with their payment.
