@@ -7,6 +7,7 @@ import { isActiveMember } from '../lib/membership'
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer'
 
 const ADMIN_PASSWORD = 'sigidrigi2025'
+const EDITOR_PASSWORD = 'songs2025'
 const BUCKET = 'instrumentals'
 
 function AudioUploader({ value, onChange, onBpmDetecting, onBpmDetected }) {
@@ -254,6 +255,7 @@ export default function Admin() {
 
   function unlock() {
     if (pw === ADMIN_PASSWORD) { setUnlocked(true); setIsEditor(false); loadData() }
+    else if (pw === EDITOR_PASSWORD) { setUnlocked(true); setIsEditor(true); setEditorName('Editor'); loadData() }
     else setPwError(true)
   }
 
