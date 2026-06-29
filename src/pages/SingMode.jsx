@@ -282,11 +282,10 @@ export default function SingMode() {
           return (
             <p key={i} className="font-playfair"
               style={{
-                fontSize: isCurrent || isNext ? 34 : 26,
-                fontWeight: isCurrent ? 800 : 600,
+                fontSize: isCurrent ? 32 : isNext ? 28 : 24,
+                fontWeight: isCurrent ? 700 : 500,
                 lineHeight: `${lineHeight}px`,
-                color: isCurrent ? 'var(--accent)' : isNext ? 'var(--text)' : 'rgba(255,255,255,0.25)',
-                textShadow: isCurrent ? '0 0 30px rgba(0,229,160,0.4)' : 'none',
+                color: isCurrent ? 'rgba(255,255,255,1)' : isNext ? 'rgba(255,255,255,0.55)' : isPast ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.35)',
                 transition: 'all 0.3s ease',
                 marginBottom: 0,
               }}>
