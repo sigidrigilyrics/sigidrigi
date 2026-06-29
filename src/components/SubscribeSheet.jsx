@@ -10,7 +10,7 @@ export default function SubscribeSheet({ onClose }) {
   const [refCode, setRefCode] = useState('')
   const [paymentDetails, setPaymentDetails] = useState({})
 
-  const methods = ['MPaisa', 'MyCash', 'Bank']
+  const methods = ['MPaisa', 'MyCash', 'PayPal', 'Bank']
 
   useEffect(() => {
     loadPaymentDetails().then(setPaymentDetails)
@@ -79,7 +79,19 @@ export default function SubscribeSheet({ onClose }) {
 
             {/* Payment instructions */}
             <div style={{ background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 12, padding: '14px', marginBottom: 16 }}>
-              {method === 'Bank' ? (
+              {method === 'PayPal' ? (
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, marginBottom: 10 }}>
+                    Pay <strong>$5 USD</strong> via PayPal. Add your reference code in the notes so we can identify your payment.
+                  </p>
+                  <a
+                    href={paymentDetails['PayPal'] || '#'}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#0070ba', color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px', borderRadius: 10, textDecoration: 'none', marginBottom: 8 }}>
+                    Pay with PayPal — add "{refCode}" in notes
+                  </a>
+                </>
+              ) : method === 'Bank' ? (
                 <>
                   <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, marginBottom: 10 }}>
                     Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>ANZ Bank Transfer</strong>. Message us on WhatsApp with your reference code and we'll send you the account details privately.
