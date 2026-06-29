@@ -16,6 +16,7 @@ export default function SingMode() {
   const [multiplier, setMultiplier] = useState(0.6)
   const [currentLine, setCurrentLine] = useState(0)
   const [audioError, setAudioError] = useState(false)
+  const [ytFailed, setYtFailed] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [ytReady, setYtReady] = useState(false)
   const [scrollStarted, setScrollStarted] = useState(false)
@@ -30,7 +31,7 @@ export default function SingMode() {
 
   // Hidden YouTube instrumental is the primary backing source when present
   const ytId = getYouTubeId(song?.instrumental_url)
-  const useYouTube = !!ytId
+  const useYouTube = !!ytId && !ytFailed
 
   useEffect(() => {
     pushRecent(id)
@@ -63,7 +64,7 @@ export default function SingMode() {
             else if (e.data === YT.PlayerState.PAUSED) setIsPlaying(false)
             else if (e.data === YT.PlayerState.ENDED) setIsPlaying(false)
           },
-          onError: () => setAudioError(true),
+          onError: () => { setYtFailed(true); setAudioError(!!song?.audio_url === false) },
         },
       })
     }).catch(() => {})

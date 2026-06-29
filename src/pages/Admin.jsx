@@ -6,8 +6,8 @@ import { MOCK_SONGS } from '../lib/mockData'
 import { isActiveMember } from '../lib/membership'
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer'
 
-const ADMIN_PASSWORD = 'sigidrigi2025'
-const EDITOR_PASSWORD = 'admin'
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'sigidrigi2025'
+const EDITOR_PASSWORD = import.meta.env.VITE_EDITOR_PASSWORD || 'admin'
 const BUCKET = 'instrumentals'
 
 function AudioUploader({ value, onChange, onBpmDetecting, onBpmDetected }) {
@@ -107,6 +107,8 @@ function SongFormSheet({ song, onClose, onSaved }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!form.title?.trim()) { setError('Title is required.'); return }
+    if (!form.category?.trim()) { setError('Category is required.'); return }
     setSaving(true)
     setError(null)
     const payload = { ...form, bpm: form.bpm ? parseInt(form.bpm) : null, intro: form.intro ? parseFloat(form.intro) : null }

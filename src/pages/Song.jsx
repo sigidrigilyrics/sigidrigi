@@ -65,7 +65,13 @@ export default function Song() {
     </div>
   )
   if (error) return (
-    <div style={{ padding: 20, color: 'var(--danger)' }}>{error}</div>
+    <div style={{ padding: 40, textAlign: 'center' }}>
+      <p style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</p>
+      <button onClick={() => { setError(null); setLoading(true); loadSong(id).then(({ song: s }) => { if (s) setSong(s); setLoading(false) }) }}
+        style={{ background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, fontSize: 14, padding: '10px 24px', cursor: 'pointer' }}>
+        Try again
+      </button>
+    </div>
   )
   if (!song) return null
 
@@ -236,6 +242,9 @@ export default function Song() {
             ))}
             <div style={{ background: 'linear-gradient(to bottom, transparent, var(--bg))', height: 80, marginTop: -60, position: 'relative', zIndex: 2 }} />
             <div style={{ textAlign: 'center', paddingTop: 10 }}>
+              {lines.length > 6 && (
+                <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>+ {lines.length - 6} more lines</p>
+              )}
               <button onClick={() => setShowSubscribe(true)} style={{ background: 'none', border: '1px solid var(--gold)', borderRadius: 10, color: 'var(--gold)', fontWeight: 600, fontSize: 14, padding: '10px 24px', cursor: 'pointer' }}>
                 🔒 Subscribe to read full lyrics
               </button>

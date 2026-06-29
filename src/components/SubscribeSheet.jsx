@@ -9,15 +9,21 @@ export default function SubscribeSheet({ onClose }) {
   const [done, setDone] = useState(false)
   const [refCode, setRefCode] = useState('')
   const [paymentDetails, setPaymentDetails] = useState({})
+  const [paymentDetailsError, setPaymentDetailsError] = useState(false)
+  const [subError, setSubError] = useState('')
 
   const methods = ['MPaisa', 'MyCash', 'PayPal', 'Bank']
 
   useEffect(() => {
-    loadPaymentDetails().then(setPaymentDetails)
+    loadPaymentDetails().then(d => {
+      if (!Object.keys(d).length) setPaymentDetailsError(true)
+      else setPaymentDetails(d)
+    })
   }, [])
 
   async function handleSubscribe() {
     setLoading(true)
+    setSubError('')
     let email = ''
     let userId = null
     if (isConfigured) {
@@ -28,7 +34,7 @@ export default function SubscribeSheet({ onClose }) {
     const code = generateReferenceCode(email)
     setRefCode(code)
     if (userId) {
-      await supabase.from('members').upsert({
+      const { error } = await supabase.from('members').upsert({
         id: userId,
         email,
         payment_method: method,
@@ -37,6 +43,11 @@ export default function SubscribeSheet({ onClose }) {
         status: 'pending',
         subscribed_at: new Date().toISOString(),
       })
+      if (error) {
+        setSubError('Could not save your request. Please screenshot this screen and WhatsApp us.')
+        setLoading(false)
+        return
+      }
     }
     setDone(true)
     setLoading(false)
@@ -108,7 +119,10 @@ export default function SubscribeSheet({ onClose }) {
                   <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7 }}>
                     Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>{method}</strong> to:
                   </p>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{paymentDetails[method] || 'Loading…'}</p>
+                  {paymentDetailsError
+                    ? <p style={{ fontSize: 13, color: 'var(--danger)', margin: '6px 0' }}>Could not load payment details — WhatsApp us: <strong>+679 244 0483</strong></p>
+                    : <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', margin: '6px 0' }}>{paymentDetails[method] || 'Loading…'}</p>
+                  }
                   <p style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
                     Quote reference <strong>{refCode}</strong>, then message your receipt to <strong>sigidrigilyrics@gmail.com</strong>. We'll activate your account within 24 hours.
                   </p>
@@ -146,6 +160,7 @@ export default function SubscribeSheet({ onClose }) {
               ))}
             </div>
 
+            {subError && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{subError}</p>}
             <button onClick={handleSubscribe} disabled={loading}
               style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', marginBottom: 12 }}>
               {loading ? 'Submitting…' : `Get membership — $${MEMBERSHIP_PRICE}/mo`}

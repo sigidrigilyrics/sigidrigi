@@ -125,7 +125,10 @@ export default function Home() {
 
       {loading && <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40 }}>Loading songs…</div>}
       {error && (
-        <div style={{ margin: '0 20px', background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 12, padding: 16, color: 'var(--danger)', fontSize: 14 }}>{error}</div>
+        <div style={{ margin: '0 20px', background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
+          <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 12 }}>{error}</p>
+          <button onClick={fetchSongs} style={{ background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, fontSize: 13, padding: '9px 22px', cursor: 'pointer' }}>Try again</button>
+        </div>
       )}
 
       {!loading && !error && songs.length > 0 && (

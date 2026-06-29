@@ -146,7 +146,6 @@ export default function Account() {
       <div style={{ padding: '0 20px' }}>
         {[
           ...(editorRole === 'admin' ? [{ label: 'Admin', icon: Shield, onClick: () => nav('/admin') }] : []),
-          ...(editorRole === null ? [{ label: 'Admin', icon: Shield, onClick: () => nav('/admin') }] : []),
           { label: 'About Sigidrigi', icon: Info, onClick: () => setShowAbout(true) },
           { label: 'Terms of Use', icon: FileText, onClick: () => nav('/terms') },
           { label: 'Privacy Policy', icon: Lock, onClick: () => nav('/privacy') },

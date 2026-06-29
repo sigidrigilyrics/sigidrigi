@@ -13,6 +13,10 @@ export default function LoginSheet({ onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!isConfigured) { setError('Add Supabase credentials to .env.local to enable login.'); return }
+    if (mode === 'signup' && password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
     setLoading(true)
     setError(null)
     try {
