@@ -2,35 +2,55 @@ import OpenAI from 'openai'
 import { Innertube } from 'youtubei.js'
 
 export const maxDuration = 120
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
 function extractVideoId(url) {
   const m = url.match(/(?:v=|youtu\.be\/|\/v\/|\/embed\/)([^&?#/\s]{11})/)
   return m ? m[1] : null
 }
 
+async function downloadFromYoutube(videoId) {
+  const yt = await Innertube.create()
+  // Try multiple clients in order — IOS/ANDROID usually give direct URLs
+  const clients = ['IOS', 'ANDROID', 'TV_EMBEDDED', 'WEB_EMBEDDED_PLAYER']
+  for (const client of clients) {
+    try {
+      const info = await yt.getBasicInfo(videoId, client)
+      const format = info.chooseFormat({ type: 'audio', quality: 'bestefficiency' })
+      if (!format?.url) continue
+      const resp = await fetch(format.url)
+      if (!resp.ok) continue
+      return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: 'audio/mp4' }
+    } catch {
+      continue
+    }
+  }
+  throw new Error('Could not download audio from YouTube — try uploading an audio file instead')
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { youtubeUrl, lyrics } = req.body
-  if (!youtubeUrl || !lyrics) return res.status(400).json({ error: 'Missing youtubeUrl or lyrics' })
-
-  const videoId = extractVideoId(youtubeUrl)
-  if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' })
+  const { youtubeUrl, audioBase64, audioMimeType, lyrics } = req.body
+  if (!lyrics) return res.status(400).json({ error: 'Missing lyrics' })
+  if (!youtubeUrl && !audioBase64) return res.status(400).json({ error: 'Provide a YouTube URL or audio file' })
 
   try {
-    // Use InnerTube IOS client — not blocked by bot detection
-    const yt = await Innertube.create({ generate_session_locally: true })
-    const info = await yt.getBasicInfo(videoId, 'IOS')
-    const format = info.chooseFormat({ type: 'audio', quality: 'bestefficiency' })
-    if (!format?.url) throw new Error('No audio format found for this video')
+    let audioBuffer, mimeType
 
-    const audioRes = await fetch(format.url)
-    if (!audioRes.ok) throw new Error(`Audio download failed: ${audioRes.status}`)
-    const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
+    if (audioBase64) {
+      // Direct audio upload path — most reliable
+      audioBuffer = Buffer.from(audioBase64, 'base64')
+      mimeType = audioMimeType || 'audio/mpeg'
+    } else {
+      const videoId = extractVideoId(youtubeUrl)
+      if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' })
+      ;({ buffer: audioBuffer, mimeType } = await downloadFromYoutube(videoId))
+    }
 
-    // Send to OpenAI Whisper with word-level timestamps
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const audioFile = new File([audioBuffer], 'audio.mp4', { type: 'audio/mp4' })
+    const ext = mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3' : 'mp4'
+    const audioFile = new File([audioBuffer], `audio.${ext}`, { type: mimeType })
 
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
@@ -69,7 +89,6 @@ export default async function handler(req, res) {
           end_time: w.end ?? w.end_time ?? 0
         }
       })
-
       if (timedWords.length > 0) {
         timing.push({
           line: line.trim(),

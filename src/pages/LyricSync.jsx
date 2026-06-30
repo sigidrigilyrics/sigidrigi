@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { ChevronLeft, Check, AlertCircle, Camera, Music, Loader } from 'lucide-react'
+import { ChevronLeft, Check, AlertCircle, Camera, Music, Loader, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, isConfigured } from '../lib/supabase'
 
@@ -14,6 +14,8 @@ const PROGRESS_MESSAGES = [
 export default function LyricSync() {
   const nav = useNavigate()
   const fileRef = useRef(null)
+  const audioRef = useRef(null)
+  const [audioFile, setAudioFile] = useState(null)
 
   // Read prefill from Upload page if available
   const prefill = (() => { try { return JSON.parse(localStorage.getItem('lyricSync_prefill') || '{}') } catch { return {} } })()
@@ -80,10 +82,8 @@ export default function LyricSync() {
   }
 
   async function generateTiming() {
-    if (!youtubeUrl.trim() || !lyrics.trim()) {
-      setError('Need YouTube URL and lyrics first')
-      return
-    }
+    if (!lyrics.trim()) { setError('Need lyrics first'); return }
+    if (!youtubeUrl.trim() && !audioFile) { setError('Add a YouTube URL or upload an audio file'); return }
     setGenerating(true)
     setError('')
 
@@ -96,14 +96,20 @@ export default function LyricSync() {
     }, 8000)
 
     try {
+      let body
+      if (audioFile) {
+        // Convert audio file to base64 and send directly — bypasses YouTube bot detection
+        const ab = await audioFile.arrayBuffer()
+        const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(ab)))
+        body = { audioBase64, audioMimeType: audioFile.type, lyrics: lyrics.trim() }
+      } else {
+        body = { youtubeUrl: youtubeUrl.trim(), lyrics: lyrics.trim(), introSeconds: parseFloat(introSeconds) || 0 }
+      }
+
       const res = await fetch('/api/sync-lyrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          youtubeUrl: youtubeUrl.trim(),
-          lyrics: lyrics.trim(),
-          introSeconds: parseFloat(introSeconds) || 0
-        })
+        body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to generate timing')
@@ -271,8 +277,23 @@ export default function LyricSync() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button onClick={generateTiming} style={{ background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 16, padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                  <Music size={20} /> Generate Timing with Whisper AI
+                  <Music size={20} /> {audioFile ? `Generate from: ${audioFile.name}` : 'Generate Timing with Whisper AI'}
                 </button>
+
+                {/* Audio file upload — bypasses YouTube bot detection */}
+                <input ref={audioRef} type="file" accept="audio/*" style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) setAudioFile(f); e.target.value = '' }} />
+                <button onClick={() => audioRef.current?.click()}
+                  style={{ background: audioFile ? 'rgba(0,229,160,0.08)' : 'var(--bg2)', border: `1px dashed ${audioFile ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 10, color: audioFile ? 'var(--accent)' : 'var(--text2)', fontWeight: 600, fontSize: 13, padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <Upload size={15} />
+                  {audioFile ? `✓ ${audioFile.name}` : 'Upload MP3 instead (if YouTube fails)'}
+                </button>
+                {audioFile && (
+                  <button onClick={() => setAudioFile(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
+                    ✕ Remove file, use YouTube URL
+                  </button>
+                )}
+
                 <button onClick={() => setStep(2)} style={{ background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>
                   Back
                 </button>
