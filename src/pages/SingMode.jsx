@@ -125,25 +125,46 @@ export default function SingMode() {
         if (audio && !audio.paused) t = audio.currentTime
       }
 
-      if (t > 0) {
+      // If song has line_timings, use YouTube time to drive currentLine directly
+      const lineTimings = song?.line_timings
+      if (lineTimings && Array.isArray(lineTimings) && lineTimings.length > 0 && t > 0) {
+        let activeLine = 0
+        for (let li = 0; li < lineTimings.length; li++) {
+          if (t >= lineTimings[li].start_time) activeLine = li
+        }
+        // Scroll to keep active line centered
+        const targetScroll = activeLine * lineHeight
+        scrollPosRef.current = targetScroll
+        if (scrollRef.current) scrollRef.current.scrollTop = targetScroll
+        setCurrentLine(activeLine)
+      } else if (t > 0) {
         // Audio-backed: lock to audio time with intro offset
         scrollPosRef.current = Math.max(0, (t - introSecs) * scrollSpeed)
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollPosRef.current
+          let line = Math.floor(scrollPosRef.current / lineHeight)
+          while (line < lines.length && isHeaderLine(lines[line])) line++
+          setCurrentLine(line)
+        }
       } else if (hasIntro) {
         // BPM + intro set: use wall-clock elapsed to count down intro then scroll
         const elapsed = (Date.now() - playStartRef.current) / 1000
         scrollPosRef.current = Math.max(0, (elapsed - introSecs) * scrollSpeed)
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollPosRef.current
+          let line = Math.floor(scrollPosRef.current / lineHeight)
+          while (line < lines.length && isHeaderLine(lines[line])) line++
+          setCurrentLine(line)
+        }
       } else if (scrollStartedRef.current) {
         // BPM + no intro: accumulate dt only after user taps Start scroll
         scrollPosRef.current += scrollSpeed * dt
-      }
-      // else: no intro, not started — hold at 0
-
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollPosRef.current
-        let line = Math.floor(scrollPosRef.current / lineHeight)
-        // Advance past section headers so highlight always lands on a lyric
-        while (line < lines.length && isHeaderLine(lines[line])) line++
-        setCurrentLine(line)
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollPosRef.current
+          let line = Math.floor(scrollPosRef.current / lineHeight)
+          while (line < lines.length && isHeaderLine(lines[line])) line++
+          setCurrentLine(line)
+        }
       }
       rafRef.current = requestAnimationFrame(step)
     }
