@@ -15,11 +15,15 @@ export default function LyricSync() {
   const nav = useNavigate()
   const fileRef = useRef(null)
 
-  const [step, setStep] = useState(1)
-  const [songTitle, setSongTitle] = useState('')
+  // Read prefill from Upload page if available
+  const prefill = (() => { try { return JSON.parse(localStorage.getItem('lyricSync_prefill') || '{}') } catch { return {} } })()
+  if (prefill.lyrics) { localStorage.removeItem('lyricSync_prefill') }
+
+  const [step, setStep] = useState(prefill.lyrics ? 2 : 1)
+  const [songTitle, setSongTitle] = useState(prefill.title || '')
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [introSeconds, setIntroSeconds] = useState(0)
-  const [lyrics, setLyrics] = useState('')
+  const [lyrics, setLyrics] = useState(prefill.lyrics || '')
   const [timing, setTiming] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
