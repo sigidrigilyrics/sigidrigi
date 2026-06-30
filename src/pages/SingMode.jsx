@@ -28,6 +28,10 @@ export default function SingMode() {
   const ytPlayerRef = useRef(null)
   const playStartRef = useRef(null)
   const scrollStartedRef = useRef(false)
+  const songRef = useRef(null)
+
+  // Keep songRef current so RAF loop always sees latest song data
+  songRef.current = song
 
   // Hidden YouTube instrumental is the primary backing source when present
   const ytId = getYouTubeId(song?.instrumental_url)
@@ -112,7 +116,7 @@ export default function SingMode() {
       const dt = (ts - last) / 1000
       last = ts
 
-      const introSecs = song?.intro || 0
+      const introSecs = songRef.current?.intro || 0
       const hasIntro = introSecs > 0
 
       // Time source: YouTube → MP3 → BPM clock
@@ -126,7 +130,7 @@ export default function SingMode() {
       }
 
       // If song has line_timings, use YouTube time to drive currentLine directly
-      const lineTimings = song?.line_timings
+      const lineTimings = songRef.current?.line_timings
       if (lineTimings && Array.isArray(lineTimings) && lineTimings.length > 0 && t > 0) {
         let activeLine = 0
         for (let li = 0; li < lineTimings.length; li++) {
@@ -322,10 +326,13 @@ export default function SingMode() {
 
             return (
               <p key={i} className="font-playfair" style={{
-                fontSize: isCurrent ? 36 : isNext ? 28 : 20,
+                fontSize: isCurrent ? 24 : isNext ? 19 : 15,
                 fontWeight: isCurrent ? 800 : 600,
                 lineHeight: `${lineHeight}px`,
                 marginBottom: 0,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
               }}>
                 {lyricWords.map((word, wi) => {
                   // Estimate each word's time evenly within the line's duration
