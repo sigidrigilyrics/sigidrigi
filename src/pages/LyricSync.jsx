@@ -1,66 +1,137 @@
-import { useState } from 'react'
-import { ChevronLeft, Check, AlertCircle } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { ChevronLeft, Check, AlertCircle, Camera, Music, Loader } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, isConfigured } from '../lib/supabase'
 
+const PROGRESS_MESSAGES = [
+  'Downloading audio from YouTube…',
+  'Sending to Whisper AI…',
+  'Transcribing audio…',
+  'Matching lyrics to timing…',
+  'Almost done…',
+]
+
 export default function LyricSync() {
   const nav = useNavigate()
+  const fileRef = useRef(null)
+
   const [step, setStep] = useState(1)
-  const [youtubeUrl, setYoutubeUrl] = useState('')
   const [songTitle, setSongTitle] = useState('')
-  const [lyrics, setLyrics] = useState('')
+  const [youtubeUrl, setYoutubeUrl] = useState('')
   const [introSeconds, setIntroSeconds] = useState(0)
-  const [jsonInput, setJsonInput] = useState('')
-  const [parsed, setParsed] = useState(null)
+  const [lyrics, setLyrics] = useState('')
+  const [timing, setTiming] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedId, setSavedId] = useState(null)
 
-  function parseJSON() {
-    try {
-      setError('')
-      const data = JSON.parse(jsonInput)
-      if (!data.lyric_timing || !Array.isArray(data.lyric_timing)) {
-        throw new Error('Invalid format: need lyric_timing array')
+  // OCR state
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const [ocrError, setOcrError] = useState('')
+
+  // Timing generation state
+  const [generating, setGenerating] = useState(false)
+  const [progressMsg, setProgressMsg] = useState('')
+
+  // Compress image and convert to base64
+  async function compressImage(file) {
+    return new Promise((resolve) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX = 1600
+        let w = img.width, h = img.height
+        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX }
+        if (h > MAX) { w = Math.round(w * MAX / h); h = MAX }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1])
       }
-      setParsed(data)
+      img.src = url
+    })
+  }
+
+  async function handlePhoto(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setOcrLoading(true)
+    setOcrError('')
+    try {
+      const imageBase64 = await compressImage(file)
+      const res = await fetch('/api/transcribe-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64, mimeType: 'image/jpeg' })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'OCR failed')
+      setLyrics(prev => prev ? prev + '\n' + data.lyrics : data.lyrics)
+    } catch (e) {
+      setOcrError(e.message)
+    }
+    setOcrLoading(false)
+    e.target.value = ''
+  }
+
+  async function generateTiming() {
+    if (!youtubeUrl.trim() || !lyrics.trim()) {
+      setError('Need YouTube URL and lyrics first')
+      return
+    }
+    setGenerating(true)
+    setError('')
+
+    // Cycle through progress messages
+    let msgIdx = 0
+    setProgressMsg(PROGRESS_MESSAGES[0])
+    const interval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % PROGRESS_MESSAGES.length
+      setProgressMsg(PROGRESS_MESSAGES[msgIdx])
+    }, 8000)
+
+    try {
+      const res = await fetch('/api/sync-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          youtubeUrl: youtubeUrl.trim(),
+          lyrics: lyrics.trim(),
+          introSeconds: parseFloat(introSeconds) || 0
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate timing')
+      setTiming(data.timing)
       setStep(4)
     } catch (e) {
-      setError(`Parse error: ${e.message}`)
+      setError(e.message)
     }
+    clearInterval(interval)
+    setGenerating(false)
   }
 
   async function saveSong() {
-    if (!parsed || !songTitle.trim() || !lyrics.trim()) {
-      setError('Missing: title, lyrics, or timing data')
+    if (!timing || !songTitle.trim() || !lyrics.trim()) {
+      setError('Missing title, lyrics, or timing')
       return
     }
-    if (!isConfigured) {
-      setError('Supabase not configured')
-      return
-    }
-
+    if (!isConfigured) { setError('Supabase not configured'); return }
     setSaving(true)
     setError('')
-
     try {
-      const newSong = {
+      const { data, error: err } = await supabase.from('songs').insert([{
         title: songTitle.trim(),
         lyrics: lyrics.trim(),
         bpm: 120,
         intro: parseInt(introSeconds) || 0,
         instrumental_url: youtubeUrl.trim() || null,
-        line_timings: parsed.lyric_timing,
-        category: 'Traditional',
+        line_timings: timing,
+        category: 'Contemporary',
         verified: false,
-        composer: 'Traditional'
-      }
-
-      const { data, error: err } = await supabase
-        .from('songs')
-        .insert([newSong])
-        .select()
-
+        composer: 'Unknown'
+      }]).select()
       if (err) throw err
       setSavedId(data?.[0]?.id)
       setStep(5)
@@ -70,120 +141,167 @@ export default function LyricSync() {
     setSaving(false)
   }
 
+  function reset() {
+    setStep(1); setSongTitle(''); setYoutubeUrl(''); setIntroSeconds(0)
+    setLyrics(''); setTiming(null); setError(''); setSavedId(null)
+  }
+
+  const btn = (label, onClick, disabled, full = true) => (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: full ? '100%' : 'auto',
+      background: disabled ? 'var(--bg3)' : 'linear-gradient(135deg,var(--accent),var(--accent-dark))',
+      border: 'none', borderRadius: 12, color: disabled ? 'var(--text3)' : '#000',
+      fontWeight: 700, fontSize: 15, padding: '14px 20px', cursor: disabled ? 'not-allowed' : 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+    }}>{label}</button>
+  )
+
+  const field = (label, value, onChange, opts = {}) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</label>
+      {opts.textarea
+        ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={opts.placeholder}
+            style={{ width: '100%', height: opts.height || 160, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', resize: 'vertical' }} />
+        : <input type={opts.type || 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={opts.placeholder}
+            style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, padding: '10px 12px', outline: 'none', boxSizing: 'border-box' }} />
+      }
+    </div>
+  )
+
   return (
     <div style={{ paddingBottom: 60 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '52px 20px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '52px 20px 16px' }}>
         <button onClick={() => nav(-1)} style={{ background: 'var(--bg2)', border: 'none', borderRadius: '50%', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text)', flexShrink: 0 }}>
           <ChevronLeft size={20} />
         </button>
         <div>
-          <h1 className="font-playfair" style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Lyric Sync</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Add songs with timing</p>
+          <h1 className="font-playfair" style={{ fontSize: 26, fontWeight: 800, marginBottom: 2 }}>Lyric Sync</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>
+            {step === 1 && 'Song details'}
+            {step === 2 && 'Add lyrics'}
+            {step === 3 && 'Generate timing'}
+            {step === 4 && 'Review timing'}
+            {step === 5 && 'Saved!'}
+          </p>
         </div>
       </div>
 
+      {/* Step dots */}
+      {step < 5 && (
+        <div style={{ display: 'flex', gap: 6, padding: '0 20px 20px', justifyContent: 'center' }}>
+          {[1,2,3,4].map(s => (
+            <div key={s} style={{ width: s === step ? 24 : 8, height: 8, borderRadius: 4, background: s === step ? 'var(--accent)' : s < step ? 'rgba(0,229,160,0.4)' : 'var(--bg3)', transition: 'all 0.3s' }} />
+          ))}
+        </div>
+      )}
+
       <div style={{ padding: '0 20px 20px' }}>
-        {/* Step 1: Instructions */}
+
+        {/* Step 1: Song Details */}
         {step === 1 && (
           <>
-            <div style={{ background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>How it works</h2>
-              <ol style={{ fontSize: 13, lineHeight: 1.8, paddingLeft: 20, color: 'var(--text2)' }}>
-                <li style={{ marginBottom: 8 }}>Run Python script: <code style={{ background: 'var(--bg2)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>python scripts/sync_lyrics.py</code></li>
-                <li style={{ marginBottom: 8 }}>Enter YouTube URL, song title, intro time, lyrics</li>
-                <li style={{ marginBottom: 8 }}>Whisper transcribes audio → matches timing</li>
-                <li>Get <code style={{ background: 'var(--bg2)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>lyric_timing.json</code></li>
-              </ol>
-            </div>
-            <button onClick={() => setStep(2)} style={{
-              width: '100%',
-              background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))',
-              border: 'none',
-              borderRadius: 12,
-              color: '#000',
-              fontWeight: 700,
-              fontSize: 15,
-              padding: '15px',
-              cursor: 'pointer'
-            }}>
-              I have lyric_timing.json
-            </button>
+            {field('Song Title *', songTitle, setSongTitle, { placeholder: 'e.g. Noqu Daulomani' })}
+            {field('YouTube Instrumental URL *', youtubeUrl, setYoutubeUrl, { placeholder: 'https://youtu.be/...' })}
+            {field('Intro (seconds before singing starts)', introSeconds, setIntroSeconds, { type: 'number', placeholder: 'e.g. 31' })}
+            {btn('Next → Add Lyrics', () => setStep(2), !songTitle.trim() || !youtubeUrl.trim())}
           </>
         )}
 
-        {/* Step 2: Song metadata */}
+        {/* Step 2: Lyrics */}
         {step === 2 && (
           <>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Song title *</label>
-            <input value={songTitle} onChange={e => setSongTitle(e.target.value)} placeholder="e.g. Vaka Na Vula Cabe Mai"
-              style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, padding: '10px 12px', outline: 'none', marginBottom: 14, boxSizing: 'border-box' }} />
+            {/* OCR Photo Button */}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
+            <button onClick={() => fileRef.current?.click()} disabled={ocrLoading}
+              style={{ width: '100%', background: 'var(--bg2)', border: '2px dashed var(--border)', borderRadius: 12, color: ocrLoading ? 'var(--text3)' : 'var(--accent)', fontWeight: 700, fontSize: 14, padding: '14px', cursor: ocrLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
+              {ocrLoading ? <><Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /> Scanning photo…</> : <><Camera size={18} /> Scan from Photo</>}
+            </button>
 
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>YouTube instrumental URL</label>
-            <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtu.be/..."
-              style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, padding: '10px 12px', outline: 'none', marginBottom: 14, boxSizing: 'border-box' }} />
+            {ocrError && (
+              <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 10, padding: 10, marginBottom: 12, color: 'var(--danger)', fontSize: 12 }}>
+                {ocrError}
+              </div>
+            )}
 
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Intro (seconds)</label>
-            <input type="number" value={introSeconds} onChange={e => setIntroSeconds(e.target.value)} placeholder="e.g. 24"
-              style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, padding: '10px 12px', outline: 'none', marginBottom: 14, boxSizing: 'border-box' }} />
+            {field('Lyrics *', lyrics, setLyrics, { textarea: true, height: 280, placeholder: 'Paste or scan lyrics here\nOne line per line\nNo section headers' })}
 
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Lyrics *</label>
-            <textarea value={lyrics} onChange={e => setLyrics(e.target.value)} placeholder="VERSE 1&#10;LINE 1&#10;LINE 2..."
-              style={{ width: '100%', height: 120, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, padding: '10px 12px', outline: 'none', marginBottom: 14, boxSizing: 'border-box', fontFamily: 'monospace' }} />
+            <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 16, textAlign: 'center' }}>
+              {lyrics.trim().split('\n').filter(l => l.trim()).length} lines
+            </p>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setStep(1)} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Back</button>
-              <button onClick={() => setStep(3)} disabled={!songTitle.trim() || !lyrics.trim()} style={{ flex: 1, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, padding: '12px', cursor: 'pointer', opacity: (songTitle.trim() && lyrics.trim()) ? 1 : 0.5 }}>Next</button>
+              <button onClick={() => setStep(3)} disabled={!lyrics.trim()} style={{ flex: 2, background: !lyrics.trim() ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 10, color: !lyrics.trim() ? 'var(--text3)' : '#000', fontWeight: 700, padding: '12px', cursor: !lyrics.trim() ? 'not-allowed' : 'pointer' }}>
+                Next → Generate Timing
+              </button>
             </div>
           </>
         )}
 
-        {/* Step 3: Paste JSON */}
+        {/* Step 3: Generate Timing */}
         {step === 3 && (
           <>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase' }}>Paste lyric_timing.json *</label>
-            <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} placeholder='{"lyric_timing":[...]}'
-              style={{ width: '100%', height: 200, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 12, padding: '10px 12px', outline: 'none', marginBottom: 12, boxSizing: 'border-box', fontFamily: 'monospace' }} />
+            {/* Summary */}
+            <div style={{ background: 'var(--bg2)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <p className="font-playfair" style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>{songTitle}</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>{youtubeUrl}</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                Intro: {introSeconds}s · {lyrics.trim().split('\n').filter(l => l.trim()).length} lyric lines
+              </p>
+            </div>
 
             {error && (
-              <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 10, padding: 12, marginBottom: 12, color: 'var(--danger)', fontSize: 13, display: 'flex', gap: 8 }}>
+              <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid var(--danger)', borderRadius: 10, padding: 12, marginBottom: 16, color: 'var(--danger)', fontSize: 13, display: 'flex', gap: 8 }}>
                 <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
                 {error}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setStep(2)} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Back</button>
-              <button onClick={parseJSON} disabled={!jsonInput.trim()} style={{ flex: 1, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, padding: '12px', cursor: 'pointer', opacity: jsonInput.trim() ? 1 : 0.5 }}>Parse</button>
-            </div>
+            {generating ? (
+              <div style={{ textAlign: 'center', padding: '30px 0' }}>
+                <div style={{ width: 48, height: 48, border: '3px solid var(--bg3)', borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 1s linear infinite' }} />
+                <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{progressMsg}</p>
+                <p style={{ color: 'var(--text3)', fontSize: 12 }}>This takes ~30–60 seconds…</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button onClick={generateTiming} style={{ background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 16, padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <Music size={20} /> Generate Timing with Whisper AI
+                </button>
+                <button onClick={() => setStep(2)} style={{ background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>
+                  Back
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {/* Step 4: Review */}
-        {step === 4 && parsed && (
+        {step === 4 && timing && (
           <>
             <div style={{ background: 'var(--bg2)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 4, textTransform: 'uppercase' }}>Song</p>
-              <p className="font-playfair" style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>{songTitle}</p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 4, textTransform: 'uppercase' }}>Timing preview</p>
+              <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
                 <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 4, textTransform: 'uppercase' }}>Intro</p>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{introSeconds}s</p>
+                  <p style={{ fontSize: 11, color: 'var(--text3)' }}>LINES</p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>{timing.length}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 4, textTransform: 'uppercase' }}>Lines</p>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{parsed.lyric_timing.length}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text3)' }}>DURATION</p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>
+                    {timing.length > 0 ? `${timing[timing.length-1].end_time.toFixed(0)}s` : '–'}
+                  </p>
                 </div>
               </div>
-
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase' }}>Preview</p>
-              <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 10, maxHeight: 150, overflowY: 'auto' }}>
-                {parsed.lyric_timing.slice(0, 10).map((line, i) => (
+              <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 10, maxHeight: 200, overflowY: 'auto' }}>
+                {timing.slice(0, 12).map((line, i) => (
                   <div key={i} style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>
-                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{line.start_time.toFixed(2)}s</span> — {line.line}
+                    <span style={{ color: 'var(--accent)', fontWeight: 700, minWidth: 48, display: 'inline-block' }}>{line.start_time.toFixed(1)}s</span>
+                    {line.line}
                   </div>
                 ))}
+                {timing.length > 12 && <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>…and {timing.length - 12} more lines</p>}
               </div>
             </div>
 
@@ -195,10 +313,9 @@ export default function LyricSync() {
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setStep(3)} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Back</button>
-              <button onClick={saveSong} disabled={saving} style={{ flex: 1, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: saving ? 0.6 : 1 }}>
-                <Check size={16} />
-                {saving ? 'Saving...' : 'Save Song'}
+              <button onClick={() => setStep(3)} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Redo</button>
+              <button onClick={saveSong} disabled={saving} style={{ flex: 2, background: saving ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 10, color: saving ? 'var(--text3)' : '#000', fontWeight: 700, padding: '12px', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Check size={16} /> {saving ? 'Saving…' : 'Save Song'}
               </button>
             </div>
           </>
@@ -207,29 +324,27 @@ export default function LyricSync() {
         {/* Step 5: Success */}
         {step === 5 && (
           <>
-            <div style={{ background: 'rgba(0,229,160,0.1)', border: '1px solid var(--accent)', borderRadius: 12, padding: 20, textAlign: 'center', marginBottom: 20 }}>
-              <Check size={48} color="var(--accent)" style={{ margin: '0 auto 12px' }} />
-              <p className="font-playfair" style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Song added!</p>
-              <p style={{ color: 'var(--text2)', fontSize: 13 }}>
-                {songTitle} is now in the catalogue with {parsed.lyric_timing.length} timed lines.
+            <div style={{ background: 'rgba(0,229,160,0.1)', border: '1px solid var(--accent)', borderRadius: 12, padding: 24, textAlign: 'center', marginBottom: 20 }}>
+              <Check size={52} color="var(--accent)" style={{ margin: '0 auto 12px' }} />
+              <p className="font-playfair" style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Song saved!</p>
+              <p style={{ color: 'var(--text2)', fontSize: 14 }}>
+                <strong>{songTitle}</strong> — {timing?.length} lines with karaoke timing
               </p>
             </div>
-
+            {savedId && (
+              <button onClick={() => nav(`/sing/${savedId}`)} style={{ width: '100%', background: 'var(--accent)', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 15, padding: '14px', cursor: 'pointer', marginBottom: 10 }}>
+                Test in Sing Mode
+              </button>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => nav('/admin')} style={{ flex: 1, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#000', fontWeight: 700, padding: '12px', cursor: 'pointer' }}>Back to Admin</button>
-              <button onClick={() => {
-                setStep(1)
-                setSongTitle('')
-                setSongTitle('')
-                setLyrics('')
-                setIntroSeconds(0)
-                setJsonInput('')
-                setParsed(null)
-              }} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Add another</button>
+              <button onClick={() => nav('/admin')} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Admin</button>
+              <button onClick={reset} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 10, color: 'var(--text)', fontWeight: 600, padding: '12px', cursor: 'pointer' }}>Add Another</button>
             </div>
           </>
         )}
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
