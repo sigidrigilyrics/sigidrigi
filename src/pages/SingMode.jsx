@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music, Timer } from 'lucide-react'
-import { loadSong, findCachedSong } from '../lib/songs'
+import { loadSong, findCachedSong, getCachedCatalog, loadCatalog } from '../lib/songs'
 import { pushRecent } from '../lib/recent'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
+import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
 
 export default function SingMode() {
   const { id } = useParams()
@@ -29,9 +30,22 @@ export default function SingMode() {
   const playStartRef = useRef(null)
   const scrollStartedRef = useRef(false)
   const songRef = useRef(null)
+  const { isMember } = useMembership()
+  const [catalogReady, setCatalogReady] = useState(!!getCachedCatalog())
 
   // Keep songRef current so RAF loop always sees latest song data
   songRef.current = song
+
+  // Warm the catalogue so isFreeThisWeek can compute on a cold deep-link
+  useEffect(() => {
+    if (!catalogReady) loadCatalog().then(() => setCatalogReady(true))
+  }, [catalogReady])
+
+  // Paywall: a locked song redirects to the Song page, where the Subscribe CTA lives
+  const locked = LOCK_CONTENT && catalogReady && !!song && !canAccess(song, isMember)
+  useEffect(() => {
+    if (locked) nav(`/song/${id}`, { replace: true })
+  }, [locked, id, nav])
 
   // Hidden YouTube instrumental is the primary backing source when present
   const ytId = getYouTubeId(song?.instrumental_url)
@@ -241,7 +255,7 @@ export default function SingMode() {
     }
   }
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
+  if (loading || (LOCK_CONTENT && !catalogReady) || locked) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
   if (error) return <div style={{ padding: 20, background: '#070707', color: 'var(--danger)', height: '100vh' }}>{error}</div>
   if (!song) return null
 

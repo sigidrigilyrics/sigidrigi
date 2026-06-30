@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Heart, Share2, Play, Pause, Music, ExternalLink } from 'lucide-react'
-import { loadSong, findCachedSong } from '../lib/songs'
+import { loadSong, findCachedSong, getCachedCatalog, loadCatalog } from '../lib/songs'
 import { pushRecent } from '../lib/recent'
 import { useFavorites } from '../lib/favorites'
-import { useMembership, canAccess } from '../lib/membership'
+import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
 import SubscribeSheet from '../components/SubscribeSheet'
 
 export default function Song() {
@@ -21,6 +21,9 @@ export default function Song() {
   const audioRef = useRef(null)
   const { isFavorite, toggle } = useFavorites()
   const { isMember } = useMembership()
+  // The free-this-week set needs the whole catalogue cached. On a cold deep-link
+  // it may be empty, so warm it before deciding access (else free songs misfire).
+  const [catalogReady, setCatalogReady] = useState(!!getCachedCatalog())
 
   async function handleShare() {
     const url = `${window.location.origin}/song/${id}`
@@ -45,6 +48,10 @@ export default function Song() {
     load()
   }, [id])
 
+  useEffect(() => {
+    if (!catalogReady) loadCatalog().then(() => setCatalogReady(true))
+  }, [catalogReady])
+
   function togglePlay() {
     if (!audioRef.current) return
     if (playing) { audioRef.current.pause(); setPlaying(false) }
@@ -59,7 +66,7 @@ export default function Song() {
 
   const progress = duration ? (currentTime / duration) * 100 : 0
 
-  if (loading) return (
+  if (loading || (LOCK_CONTENT && !catalogReady)) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text2)' }}>
       Loading…
     </div>

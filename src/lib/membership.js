@@ -5,7 +5,7 @@ import { getCachedCatalog } from './songs'
 // ── Master paywall flag ──────────────────────────────────────────────
 // While false, EVERY song stays open (testing / content-loading phase).
 // Flip to true at launch to turn on the members-only paywall.
-export const LOCK_CONTENT = false
+export const LOCK_CONTENT = true
 
 export const MEMBERSHIP_PRICE = 5 // FJD / month
 
