@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
-import { generateReferenceCode, loadPaymentDetails, MEMBERSHIP_PRICE } from '../lib/membership'
+import { generateReferenceCode, loadPaymentDetails, MEMBERSHIP_PRICE, ANNUAL_PRICE } from '../lib/membership'
 
 export default function SubscribeSheet({ onClose }) {
   const [method, setMethod] = useState('MPaisa')
+  const [plan, setPlan] = useState('monthly')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [refCode, setRefCode] = useState('')
@@ -13,6 +14,9 @@ export default function SubscribeSheet({ onClose }) {
   const [subError, setSubError] = useState('')
 
   const methods = ['MPaisa', 'MyCash', 'PayPal', 'Bank']
+  const isAnnual = plan === 'annual'
+  const price = isAnnual ? ANNUAL_PRICE : MEMBERSHIP_PRICE
+  const periodLabel = isAnnual ? 'yr' : 'mo'
 
   useEffect(() => {
     loadPaymentDetails().then(d => {
@@ -38,9 +42,10 @@ export default function SubscribeSheet({ onClose }) {
         id: userId,
         email,
         payment_method: method,
-        amount_paid: MEMBERSHIP_PRICE,
+        amount_paid: price,
         reference_code: code,
         status: 'pending',
+        notes: isAnnual ? 'Annual plan' : 'Monthly plan',
         subscribed_at: new Date().toISOString(),
       })
       if (error) {
@@ -93,7 +98,7 @@ export default function SubscribeSheet({ onClose }) {
               {method === 'PayPal' ? (
                 <>
                   <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, marginBottom: 10 }}>
-                    Pay <strong>$5 USD</strong> via PayPal. Add your reference code in the notes so we can identify your payment.
+                    Pay <strong>${price} USD</strong> via PayPal{isAnnual ? ' (1 year)' : ''}. Add your reference code in the notes so we can identify your payment.
                   </p>
                   <a
                     href={paymentDetails['PayPal'] || '#'}
@@ -105,7 +110,7 @@ export default function SubscribeSheet({ onClose }) {
               ) : method === 'Bank' ? (
                 <>
                   <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, marginBottom: 10 }}>
-                    Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>ANZ Bank Transfer</strong>. Message us on WhatsApp with your reference code and we'll send you the account details privately.
+                    Send <strong>${price} FJD</strong>{isAnnual ? ' (1 year)' : ''} via <strong>ANZ Bank Transfer</strong>. Message us on WhatsApp with your reference code and we'll send you the account details privately.
                   </p>
                   <a
                     href={`https://wa.me/6792440483?text=Hi%20Sigidrigi!%20I%20want%20to%20subscribe.%20My%20reference%20code%20is%20${refCode}`}
@@ -117,7 +122,7 @@ export default function SubscribeSheet({ onClose }) {
               ) : (
                 <>
                   <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7 }}>
-                    Send <strong>${MEMBERSHIP_PRICE} FJD</strong> via <strong>{method}</strong> to:
+                    Send <strong>${price} FJD</strong>{isAnnual ? ' (1 year)' : ''} via <strong>{method}</strong> to:
                   </p>
                   {paymentDetailsError
                     ? <p style={{ fontSize: 13, color: 'var(--danger)', margin: '6px 0' }}>Could not load payment details — WhatsApp us: <strong>+679 244 0483</strong></p>
@@ -137,14 +142,29 @@ export default function SubscribeSheet({ onClose }) {
           </>
         ) : (
           <>
-            {/* Single membership */}
-            <div style={{ background: 'rgba(0,229,160,0.08)', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '16px', marginBottom: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                <span style={{ fontWeight: 800, fontSize: 18 }}>Membership</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15 }}>${MEMBERSHIP_PRICE} FJD/mo</span>
-              </div>
-              <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>Full access to the whole archive + Sing Mode with backing tracks. Cancel anytime.</p>
+            {/* Plan selector */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+              {[
+                { key: 'monthly', label: 'Monthly', amt: MEMBERSHIP_PRICE, sub: 'per month' },
+                { key: 'annual', label: 'Annual', amt: ANNUAL_PRICE, sub: '2 months free' },
+              ].map(p => (
+                <button key={p.key} type="button" onClick={() => setPlan(p.key)}
+                  style={{
+                    flex: 1, textAlign: 'left', cursor: 'pointer', position: 'relative',
+                    background: plan === p.key ? 'rgba(0,229,160,0.1)' : 'var(--bg2)',
+                    border: plan === p.key ? '1.5px solid var(--accent)' : '1.5px solid transparent',
+                    borderRadius: 14, padding: '12px 14px'
+                  }}>
+                  {p.key === 'annual' && (
+                    <span style={{ position: 'absolute', top: -8, right: 10, background: 'var(--gold)', color: '#000', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999, letterSpacing: '0.04em' }}>BEST VALUE</span>
+                  )}
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13, color: plan === p.key ? 'var(--accent)' : 'var(--text)' }}>{p.label}</span>
+                  <span style={{ display: 'block', fontWeight: 800, fontSize: 20, marginTop: 2 }}>${p.amt}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)' }}> FJD</span></span>
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{p.sub}</span>
+                </button>
+              ))}
             </div>
+            <p style={{ color: 'var(--text2)', fontSize: 12.5, lineHeight: 1.6, marginBottom: 18 }}>Full access to the whole archive + Sing Mode with backing tracks. Cancel anytime.</p>
 
             {/* Payment method */}
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 8 }}>Pay with</p>
@@ -163,7 +183,7 @@ export default function SubscribeSheet({ onClose }) {
             {subError && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{subError}</p>}
             <button onClick={handleSubscribe} disabled={loading}
               style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', marginBottom: 12 }}>
-              {loading ? 'Submitting…' : `Get membership — $${MEMBERSHIP_PRICE}/mo`}
+              {loading ? 'Submitting…' : `Get membership — $${price}/${periodLabel}`}
             </button>
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>Payments are confirmed manually during early access. You'll get a reference code + payment details next.</p>
           </>

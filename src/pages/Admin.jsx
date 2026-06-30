@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera, Users, UserPlus, UserMinus, LogOut, Timer } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
-import { isActiveMember } from '../lib/membership'
+import { isActiveMember, planDays } from '../lib/membership'
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer'
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'sigidrigi2025'
@@ -208,16 +208,119 @@ function MembersPanel({ members, filter, setFilter, onActivate, onRenew, onDeact
           <p style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email || '—'}</p>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
             {m.reference_code ? `${m.reference_code} · ` : ''}{m.payment_method || ''}
+            {m.amount_paid ? ` · $${m.amount_paid}${planDays(m.amount_paid) === 365 ? ' (annual)' : ''}` : ''}
             {m.expires_at ? ` · until ${new Date(m.expires_at).toLocaleDateString()}` : ''}
           </p>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            {m.status === 'pending' && <button onClick={() => onActivate(m)} style={mBtnPrimary}>✓ Activate (30 days)</button>}
-            {active(m) && <button onClick={() => onRenew(m)} style={mBtnSecondary}>+30 days</button>}
+            {m.status === 'pending' && <button onClick={() => onActivate(m)} style={mBtnPrimary}>✓ Activate ({planDays(m.amount_paid)} days)</button>}
+            {active(m) && <button onClick={() => onRenew(m)} style={mBtnSecondary}>+{planDays(m.amount_paid)} days</button>}
             {active(m) && <button onClick={() => onDeactivate(m)} style={mBtnDanger}>Deactivate</button>}
-            {!active(m) && m.status !== 'pending' && <button onClick={() => onActivate(m)} style={mBtnPrimary}>Reactivate (30 days)</button>}
+            {!active(m) && m.status !== 'pending' && <button onClick={() => onActivate(m)} style={mBtnPrimary}>Reactivate ({planDays(m.amount_paid)} days)</button>}
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function Dashboard({ songs, members, unverified, onActivate, goMembers, nav }) {
+  const now = new Date()
+  const in7 = new Date(now); in7.setDate(in7.getDate() + 7)
+  const active = members.filter(isActiveMember)
+  const pending = members.filter(m => m.status === 'pending')
+  const expiring = active.filter(m => m.expires_at && new Date(m.expires_at) <= in7)
+  const synced = songs.filter(s => Array.isArray(s.line_timings) && s.line_timings.length > 0)
+  const withInstr = songs.filter(s => s.instrumental_url)
+  const annualCount = active.filter(m => planDays(m.amount_paid) === 365).length
+  // Monthly-equivalent revenue: annual subs amortised over 12 months.
+  const mrr = Math.round(active.reduce((sum, m) =>
+    sum + (planDays(m.amount_paid) === 365 ? Number(m.amount_paid || 50) / 12 : Number(m.amount_paid || 5)), 0))
+  const syncPct = songs.length ? Math.round((synced.length / songs.length) * 100) : 0
+
+  const statCard = (value, label, color) => (
+    <div style={{ flex: 1, background: 'var(--bg1)', borderRadius: 14, padding: '14px 10px', textAlign: 'center' }}>
+      <span className="font-playfair" style={{ fontSize: 26, fontWeight: 800, color, display: 'block', lineHeight: 1, marginBottom: 4 }}>{value}</span>
+      <span style={{ fontSize: 10.5, color: 'var(--text3)', fontWeight: 500 }}>{label}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '0 20px' }}>
+      {/* Revenue hero */}
+      <div style={{ background: 'linear-gradient(135deg, rgba(0,229,160,0.12), rgba(0,229,160,0.03))', border: '1px solid rgba(0,229,160,0.25)', borderRadius: 18, padding: '18px 20px', marginBottom: 14 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 6 }}>Est. monthly revenue</p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span className="font-playfair" style={{ fontSize: 42, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>${mrr}</span>
+          <span style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>/ mo</span>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 8 }}>
+          {active.length} active {active.length === 1 ? 'subscriber' : 'subscribers'}
+          {annualCount > 0 ? ` · ${annualCount} annual` : ''}
+        </p>
+      </div>
+
+      {/* Member stats */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        {statCard(active.length, 'Active', 'var(--accent)')}
+        {statCard(pending.length, 'Pending', pending.length ? 'var(--gold)' : 'var(--text)')}
+        {statCard(expiring.length, 'Expiring ≤7d', expiring.length ? 'var(--danger)' : 'var(--text)')}
+      </div>
+
+      {/* Catalogue health */}
+      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', margin: '6px 0 10px' }}>Catalogue</p>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        {statCard(songs.length, 'Songs', 'var(--text)')}
+        {statCard(`${synced.length}`, `Synced · ${syncPct}%`, 'var(--accent)')}
+        {statCard(withInstr.length, 'Backing', 'var(--text)')}
+        {statCard(unverified.length, 'To verify', unverified.length ? 'var(--gold)' : 'var(--text)')}
+      </div>
+
+      {/* Action items */}
+      {(pending.length > 0 || expiring.length > 0 || (songs.length - synced.length) > 0) && (
+        <>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', margin: '10px 0 10px' }}>Needs attention</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            {pending.length > 0 && (
+              <button onClick={goMembers} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.3)', borderRadius: 12, padding: '12px 14px', cursor: 'pointer', color: 'var(--text)', textAlign: 'left' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>💰 {pending.length} payment{pending.length > 1 ? 's' : ''} to confirm</span>
+                <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 700 }}>Review →</span>
+              </button>
+            )}
+            {expiring.length > 0 && (
+              <button onClick={goMembers} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,107,107,0.07)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 12, padding: '12px 14px', cursor: 'pointer', color: 'var(--text)', textAlign: 'left' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>⏳ {expiring.length} expiring this week</span>
+                <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 700 }}>Review →</span>
+              </button>
+            )}
+            {(songs.length - synced.length) > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>🎵 {songs.length - synced.length} songs need karaoke sync</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Quick-activate pending payers */}
+      {pending.length > 0 && (
+        <>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', margin: '10px 0 8px' }}>Pending payments</p>
+          {pending.slice(0, 4).map(m => (
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email || '—'}</p>
+                <p style={{ fontSize: 11, color: 'var(--text3)' }}>{m.reference_code || ''}{m.amount_paid ? ` · $${m.amount_paid}${planDays(m.amount_paid) === 365 ? ' annual' : ''}` : ''}{m.payment_method ? ` · ${m.payment_method}` : ''}</p>
+              </div>
+              <button onClick={() => onActivate(m)} style={{ ...mBtnPrimary, flexShrink: 0 }}>✓ Activate ({planDays(m.amount_paid)}d)</button>
+            </div>
+          ))}
+          {pending.length > 4 && (
+            <button onClick={goMembers} style={{ width: '100%', background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 600, fontSize: 13, padding: '12px', cursor: 'pointer' }}>
+              View all {pending.length} pending →
+            </button>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -262,6 +365,7 @@ export default function Admin() {
       if (data?.role === 'editor' || data?.role === 'admin') {
         setIsEditor(data.role === 'editor')
         setEditorName(data.name || user.email)
+        setTab(data.role === 'editor' ? 'songs' : 'dashboard')
         setUnlocked(true)
         loadData()
       }
@@ -270,8 +374,8 @@ export default function Admin() {
   }, [])
 
   function unlock() {
-    if (pw === ADMIN_PASSWORD) { setUnlocked(true); setIsEditor(false); loadData() }
-    else if (pw === EDITOR_PASSWORD) { setUnlocked(true); setIsEditor(true); setEditorName('Editor'); loadData() }
+    if (pw === ADMIN_PASSWORD) { setUnlocked(true); setIsEditor(false); setTab('dashboard'); loadData() }
+    else if (pw === EDITOR_PASSWORD) { setUnlocked(true); setIsEditor(true); setEditorName('Editor'); setTab('songs'); loadData() }
     else setPwError(true)
   }
 
@@ -323,17 +427,19 @@ export default function Admin() {
 
   async function activateMember(m) {
     const now = new Date()
+    const days = planDays(m.amount_paid)
     const expires = new Date(now)
-    expires.setDate(expires.getDate() + 30)
+    expires.setDate(expires.getDate() + days)
     await supabase.from('members').update({ status: 'active', paid_at: now.toISOString(), expires_at: expires.toISOString() }).eq('id', m.id)
-    showToast(`${m.email} activated — expires in 30 days`)
+    showToast(`${m.email} activated — expires in ${days} days`)
     loadData()
   }
   async function renewMember(m) {
+    const days = planDays(m.amount_paid)
     const base = m.expires_at && new Date(m.expires_at) > new Date() ? new Date(m.expires_at) : new Date()
-    base.setDate(base.getDate() + 30)
+    base.setDate(base.getDate() + days)
     await supabase.from('members').update({ status: 'active', expires_at: base.toISOString() }).eq('id', m.id)
-    showToast(`${m.email} renewed +30 days`)
+    showToast(`${m.email} renewed +${days} days`)
     loadData()
   }
   async function deactivateMember(m) {
@@ -415,13 +521,20 @@ export default function Admin() {
 
       {/* Tab toggle */}
       <div style={{ display: 'flex', gap: 8, padding: '0 20px', marginBottom: 18 }}>
-        {[['songs', 'Songs'], ...(!isEditor ? [['members', 'Members'], ['editors', 'Editors']] : [])].map(([id, label]) => (
+        {[...(!isEditor ? [['dashboard', 'Home']] : []), ['songs', 'Songs'], ...(!isEditor ? [['members', 'Members'], ['editors', 'Editors']] : [])].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             style={{ flex: 1, background: tab === id ? 'rgba(0,229,160,0.1)' : 'var(--bg2)', border: tab === id ? '1.5px solid var(--accent)' : '1.5px solid transparent', borderRadius: 10, color: tab === id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 13, padding: '9px', cursor: 'pointer' }}>
             {label}
           </button>
         ))}
       </div>
+
+      {tab === 'dashboard' && !isEditor && (
+        <Dashboard songs={songs} members={members} unverified={unverified}
+          onActivate={activateMember}
+          goMembers={() => { setMemberFilter('pending'); setTab('members') }}
+          nav={nav} />
+      )}
 
       {tab === 'songs' && (
       <>

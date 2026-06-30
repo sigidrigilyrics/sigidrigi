@@ -8,6 +8,13 @@ import { getCachedCatalog } from './songs'
 export const LOCK_CONTENT = true
 
 export const MEMBERSHIP_PRICE = 5 // FJD / month
+export const ANNUAL_PRICE = 50 // FJD / year (≈ 2 months free vs monthly)
+
+// Days of access a payment buys, inferred from the amount paid. Lets the Admin
+// activate annual payers for a full year without a separate "plan" column.
+export function planDays(amountPaid) {
+  return Number(amountPaid) >= ANNUAL_PRICE ? 365 : 30
+}
 
 // Payment details are stored in Supabase app_settings table (not in source code).
 // Keys: payment_MPaisa, payment_MyCash, payment_Bank
