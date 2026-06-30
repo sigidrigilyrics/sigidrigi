@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import ytdl from '@distube/ytdl-core'
+import play from 'play-dl'
 
 export const maxDuration = 120
 
@@ -10,19 +10,19 @@ export default async function handler(req, res) {
   if (!youtubeUrl || !lyrics) return res.status(400).json({ error: 'Missing youtubeUrl or lyrics' })
 
   try {
-    // Download lowest quality audio from YouTube
-    const stream = ytdl(youtubeUrl, { filter: 'audioonly', quality: 'lowestaudio' })
+    // Download lowest quality audio from YouTube via play-dl
+    const streamData = await play.stream(youtubeUrl, { quality: 0 })
     const chunks = []
     await new Promise((resolve, reject) => {
-      stream.on('data', c => chunks.push(c))
-      stream.on('end', resolve)
-      stream.on('error', reject)
+      streamData.stream.on('data', c => chunks.push(c))
+      streamData.stream.on('end', resolve)
+      streamData.stream.on('error', reject)
     })
     const audioBuffer = Buffer.concat(chunks)
 
     // Send to OpenAI Whisper with word-level timestamps
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const audioFile = new File([audioBuffer], 'audio.mp4', { type: 'audio/mp4' })
+    const audioFile = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' })
 
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
@@ -37,7 +37,6 @@ export default async function handler(req, res) {
       if (seg.words?.length) {
         allWords.push(...seg.words)
       } else {
-        // fallback: distribute segment time across words
         const words = (seg.text || '').trim().split(/\s+/).filter(Boolean)
         const dur = (seg.end - seg.start) / (words.length || 1)
         words.forEach((w, i) => allWords.push({
