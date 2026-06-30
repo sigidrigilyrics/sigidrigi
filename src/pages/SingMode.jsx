@@ -263,32 +263,71 @@ export default function SingMode() {
         <div style={{ width: 20 }} />
       </div>
 
-      {/* Lyrics scroll — full screen */}
+      {/* Lyrics scroll — karaoke style with word highlighting */}
       <div ref={scrollRef}
         style={{ position: 'absolute', inset: 0, overflowY: 'hidden', padding: '20px 20px 20px', textAlign: 'center' }}>
-        {/* Spacer so first line starts in center */}
         <div style={{ height: 180 }} />
         {lines.map((line, i) => {
           const isCurrent = i === currentLine
           const isNext = i === currentLine + 1
           const isPast = i < currentLine
           const isHeader = isHeaderLine(line)
+
           if (isHeader) return (
             <p key={i} style={{
               fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
               lineHeight: `${lineHeight}px`, color: 'rgba(255,255,255,0.2)', marginBottom: 0,
             }}>{line}</p>
           )
-          return (
-            <p key={i} className="font-playfair"
-              style={{
-                fontSize: isCurrent ? 32 : isNext ? 28 : 24,
-                fontWeight: isCurrent ? 700 : 500,
+
+          // Get word-level timing if available
+          const timingData = song?.line_timings?.[i]
+          const hasWordTiming = timingData?.words && Array.isArray(timingData.words)
+
+          if (hasWordTiming) {
+            // Karaoke: highlight word by word
+            let currentTime = 0
+            if (useYouTube && ytPlayerRef.current) {
+              try { currentTime = ytPlayerRef.current.getCurrentTime() || 0 } catch { }
+            } else if (audioRef.current && !audioRef.current.paused) {
+              currentTime = audioRef.current.currentTime
+            }
+
+            return (
+              <p key={i} className="font-playfair" style={{
+                fontSize: isCurrent ? 36 : isNext ? 28 : 20,
+                fontWeight: isCurrent ? 800 : 600,
                 lineHeight: `${lineHeight}px`,
-                color: isCurrent ? 'rgba(255,255,255,1)' : isNext ? 'rgba(255,255,255,0.55)' : isPast ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.3s ease',
                 marginBottom: 0,
               }}>
+                {timingData.words.map((word, wi) => {
+                  const isActive = currentTime >= word.start_time && currentTime < word.end_time
+                  const isPastWord = currentTime >= word.end_time
+                  return (
+                    <span key={wi} style={{
+                      color: isActive ? 'var(--accent)' : isPastWord ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)',
+                      textShadow: isActive ? '0 0 20px rgba(0,229,160,0.6)' : 'none',
+                      transition: 'all 0.1s ease',
+                      marginRight: '0.3em'
+                    }}>
+                      {word.text}
+                    </span>
+                  )
+                })}
+              </p>
+            )
+          }
+
+          // Fallback: line-level highlighting
+          return (
+            <p key={i} className="font-playfair" style={{
+              fontSize: isCurrent ? 32 : isNext ? 28 : 24,
+              fontWeight: isCurrent ? 700 : 500,
+              lineHeight: `${lineHeight}px`,
+              color: isCurrent ? 'rgba(255,255,255,1)' : isNext ? 'rgba(255,255,255,0.55)' : isPast ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.35)',
+              transition: 'all 0.3s ease',
+              marginBottom: 0,
+            }}>
               {line}
             </p>
           )
