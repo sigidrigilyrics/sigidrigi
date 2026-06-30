@@ -15,9 +15,10 @@ def download_audio(youtube_url: str, output_path: str = "temp_audio.m4a") -> str
     print(f"\n📥 Downloading audio...")
     try:
         cmd = [
-            "yt-dlp",
-            "-f", "bestaudio[ext=m4a]/best",
+            sys.executable, "-m", "yt_dlp",
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
             "-o", output_path,
+            "--no-playlist",
             youtube_url
         ]
         subprocess.run(cmd, check=True)
@@ -39,21 +40,23 @@ def transcribe_with_whisper(audio_path: str) -> dict:
 
     # Check if whisper is installed
     try:
-        subprocess.run(["whisper", "--version"], capture_output=True, check=True)
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        print("❌ Whisper not found. Install: pip install openai-whisper")
-        sys.exit(1)
+        subprocess.run([sys.executable, "-m", "whisper", "--help"], capture_output=True)
+    except Exception:
+        pass  # will fail below if truly missing
 
     # Run Whisper with verbose_json output for word-level timing
     cmd = [
-        "whisper",
+        sys.executable, "-m", "whisper",
         audio_path,
         "--model", "base",
-        "--language", "en",
-        "--output_format", "verbose_json",  # Includes word-level timing
+        "--language", "fj",
+        "--output_format", "verbose_json",
         "--output_dir", "whisper_output"
     ]
-    subprocess.run(cmd, check=True)
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        print("❌ Whisper failed. Install: pip install openai-whisper")
+        sys.exit(1)
 
     json_file = Path("whisper_output") / f"{Path(audio_path).stem}.json"
     with open(json_file, encoding='utf-8') as f:
