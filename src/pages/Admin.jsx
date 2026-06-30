@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera, Users, UserPlus, UserMinus, LogOut } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Lock, CheckCircle, Music, Upload as UploadIcon, X, Camera, Users, UserPlus, UserMinus, LogOut, Timer } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { MOCK_SONGS } from '../lib/mockData'
 import { isActiveMember } from '../lib/membership'
@@ -459,8 +459,15 @@ export default function Admin() {
                 <p style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</p>
                 {song.verified && <CheckCircle size={12} color="var(--accent)" style={{ flexShrink: 0 }} />}
               </div>
-              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>{song.category} · {song.free ? 'Free' : 'Members'}</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>
+                {song.category} · {song.free ? 'Free' : 'Members'}
+                {song.line_timings?.length > 0 && <span style={{ color: 'var(--accent)' }}> · ✓ synced</span>}
+              </p>
             </div>
+            <button onClick={() => nav(`/tap-sync/${song.id}`)} title="Tap-sync karaoke timing"
+              style={{ width: 34, height: 34, borderRadius: 8, background: song.line_timings?.length > 0 ? 'rgba(0,229,160,0.12)' : 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: song.line_timings?.length > 0 ? 'var(--accent)' : 'var(--text2)', flexShrink: 0 }}>
+              <Timer size={14} />
+            </button>
             <button onClick={() => { setEditSong(song); setShowForm(true) }}
               style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)', flexShrink: 0 }}>
               <Pencil size={14} />

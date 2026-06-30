@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music } from 'lucide-react'
+import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music, Timer } from 'lucide-react'
 import { loadSong, findCachedSong } from '../lib/songs'
 import { pushRecent } from '../lib/recent'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
@@ -121,17 +121,25 @@ export default function SingMode() {
 
       // Time source: YouTube → MP3 → BPM clock
       let t = 0
+      let haveAudioTime = false
       if (useYouTube) {
         const p = ytPlayerRef.current
-        if (p && p.getCurrentTime) { try { t = p.getCurrentTime() || 0 } catch { t = 0 } }
+        if (p && p.getCurrentTime) { try { t = p.getCurrentTime() || 0; haveAudioTime = true } catch { t = 0 } }
       } else {
         const audio = audioRef.current
-        if (audio && !audio.paused) t = audio.currentTime
+        if (audio && !audio.paused) { t = audio.currentTime; haveAudioTime = true }
       }
 
-      // If song has line_timings, use YouTube time to drive currentLine directly
       const lineTimings = songRef.current?.line_timings
-      if (lineTimings && Array.isArray(lineTimings) && lineTimings.length > 0 && t > 0) {
+      const hasLineTimings = lineTimings && Array.isArray(lineTimings) && lineTimings.length > 0
+
+      // Tap-synced song with no audio: drive the timeline from wall-clock since Play
+      if (hasLineTimings && !haveAudioTime) {
+        t = (Date.now() - playStartRef.current) / 1000
+      }
+
+      // If song has line_timings, use the timeline to drive currentLine directly
+      if (hasLineTimings && t > 0) {
         let activeLine = 0
         for (let li = 0; li < lineTimings.length; li++) {
           if (t >= lineTimings[li].start_time) activeLine = li
@@ -285,7 +293,9 @@ export default function SingMode() {
             )
           })()}
         </div>
-        <div style={{ width: 20 }} />
+        <button onClick={() => nav(`/tap-sync/${id}`)} title="Tap-sync timing" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center' }}>
+          <Timer size={18} />
+        </button>
       </div>
 
       {/* Lyrics scroll — karaoke style with word highlighting */}
@@ -372,8 +382,8 @@ export default function SingMode() {
         <div style={{ height: 200 }} />
       </div>
 
-      {/* Tap to start scroll — shown when playing, no intro set, scroll not yet started */}
-      {isPlaying && !(song?.intro > 0) && !scrollStarted && (
+      {/* Tap to start scroll — shown when playing, no intro/timings set, scroll not yet started */}
+      {isPlaying && !(song?.intro > 0) && !(song?.line_timings?.length > 0) && !scrollStarted && (
         <div style={{ position: 'absolute', bottom: 180, left: 0, right: 0, zIndex: 30, display: 'flex', justifyContent: 'center' }}>
           <button onClick={e => { e.stopPropagation(); handleScrollStart() }}
             style={{ background: 'var(--accent)', border: 'none', borderRadius: 999, color: '#000', fontWeight: 800, fontSize: 15, padding: '14px 32px', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,229,160,0.5)', animation: 'pulse 1.2s ease-in-out infinite', letterSpacing: '0.04em' }}>

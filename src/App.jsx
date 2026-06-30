@@ -8,6 +8,7 @@ import AZIndex from './pages/AZIndex'
 import Upload from './pages/Upload'
 import Admin from './pages/Admin'
 import LyricSync from './pages/LyricSync'
+import TapSync from './pages/TapSync'
 import Artists from './pages/Artists'
 import Account from './pages/Account'
 import Legal from './pages/Legal'
@@ -31,7 +32,7 @@ function NotFound() {
 function Layout() {
   const { pathname } = useLocation()
   const nav = useNavigate()
-  const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin') || pathname.startsWith('/upload') || pathname.startsWith('/lyric-sync')
+  const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin') || pathname.startsWith('/upload') || pathname.startsWith('/lyric-sync') || pathname.startsWith('/tap-sync')
     || ['/terms', '/privacy', '/copyright', '/404'].includes(pathname)
 
   // Android hardware/gesture back button → navigate within the app instead of minimizing.
@@ -58,6 +59,7 @@ function Layout() {
         <Route path="/upload" element={<Upload />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/lyric-sync" element={<LyricSync />} />
+        <Route path="/tap-sync/:id" element={<TapSync />} />
         <Route path="/artists" element={<Artists />} />
         <Route path="/account" element={<Account />} />
         <Route path="/terms" element={<Legal type="terms" />} />
