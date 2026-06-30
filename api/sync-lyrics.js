@@ -1,28 +1,36 @@
 import OpenAI from 'openai'
-import play from 'play-dl'
+import { Innertube } from 'youtubei.js'
 
 export const maxDuration = 120
+
+function extractVideoId(url) {
+  const m = url.match(/(?:v=|youtu\.be\/|\/v\/|\/embed\/)([^&?#/\s]{11})/)
+  return m ? m[1] : null
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { youtubeUrl, lyrics, introSeconds } = req.body
+  const { youtubeUrl, lyrics } = req.body
   if (!youtubeUrl || !lyrics) return res.status(400).json({ error: 'Missing youtubeUrl or lyrics' })
 
+  const videoId = extractVideoId(youtubeUrl)
+  if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' })
+
   try {
-    // Download lowest quality audio from YouTube via play-dl
-    const streamData = await play.stream(youtubeUrl, { quality: 0 })
-    const chunks = []
-    await new Promise((resolve, reject) => {
-      streamData.stream.on('data', c => chunks.push(c))
-      streamData.stream.on('end', resolve)
-      streamData.stream.on('error', reject)
-    })
-    const audioBuffer = Buffer.concat(chunks)
+    // Use InnerTube IOS client — not blocked by bot detection
+    const yt = await Innertube.create({ generate_session_locally: true })
+    const info = await yt.getBasicInfo(videoId, 'IOS')
+    const format = info.chooseFormat({ type: 'audio', quality: 'bestefficiency' })
+    if (!format?.url) throw new Error('No audio format found for this video')
+
+    const audioRes = await fetch(format.url)
+    if (!audioRes.ok) throw new Error(`Audio download failed: ${audioRes.status}`)
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
 
     // Send to OpenAI Whisper with word-level timestamps
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const audioFile = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' })
+    const audioFile = new File([audioBuffer], 'audio.mp4', { type: 'audio/mp4' })
 
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
