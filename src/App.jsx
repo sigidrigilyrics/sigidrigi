@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom'
 import { App as CapApp } from '@capacitor/app'
+import { Browser } from '@capacitor/browser'
+import { supabase } from './lib/supabase'
 import Home from './pages/Home'
 import Song from './pages/Song'
 import SingMode from './pages/SingMode'
@@ -44,6 +46,22 @@ function Layout() {
       } else {
         CapApp.minimizeApp()
       }
+    }).then(h => { handle = h }).catch(() => {})
+    return () => { if (handle) handle.remove() }
+  }, [nav])
+
+  // OAuth deep-link callback (native app): Google returns to the app via the
+  // custom-scheme URL; exchange the code for a session, then land on Account.
+  useEffect(() => {
+    let handle
+    CapApp.addListener('appUrlOpen', async ({ url }) => {
+      if (!url || !url.includes('login-callback')) return
+      try {
+        const code = new URL(url).searchParams.get('code')
+        if (code) await supabase.auth.exchangeCodeForSession(code)
+      } catch { /* ignore malformed callback */ }
+      try { await Browser.close() } catch { /* nothing to close */ }
+      nav('/account')
     }).then(h => { handle = h }).catch(() => {})
     return () => { if (handle) handle.remove() }
   }, [nav])
