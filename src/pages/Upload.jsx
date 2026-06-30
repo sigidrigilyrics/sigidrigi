@@ -121,8 +121,9 @@ export default function Upload() {
         <input ref={fileRef} type="file" accept="image/*" multiple capture="environment"
           style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
 
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18, alignItems: 'start' }}>
         {pages.map((pg, i) => (
-          <div key={i} style={{ background: 'var(--bg2)', borderRadius: 16, marginBottom: 20, overflow: 'hidden' }}>
+          <div key={i} style={{ background: 'var(--bg2)', borderRadius: 16, overflow: 'hidden' }}>
             {/* Photo preview */}
             <div style={{ position: 'relative', height: 160 }}>
               <img src={pg.preview} alt={`Page ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -185,6 +186,7 @@ export default function Upload() {
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>

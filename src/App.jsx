@@ -37,6 +37,11 @@ function Layout() {
   const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin') || pathname.startsWith('/upload') || pathname.startsWith('/lyric-sync') || pathname.startsWith('/tap-sync')
     || ['/terms', '/privacy', '/copyright', '/404'].includes(pathname)
 
+  // Admin tools (manage songs, approve members, OCR upload) get a wide desktop
+  // layout instead of the phone-width 480px frame the public app uses.
+  const wideRoute = pathname.startsWith('/admin') || pathname.startsWith('/upload')
+  const maxWidth = wideRoute ? 1080 : 480
+
   // Android hardware/gesture back button → navigate within the app instead of minimizing.
   useEffect(() => {
     let handle
@@ -66,7 +71,7 @@ function Layout() {
     return () => { if (handle) handle.remove() }
   }, [nav])
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', maxWidth, margin: '0 auto' }}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/song/:id" element={<Song />} />
