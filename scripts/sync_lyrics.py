@@ -33,76 +33,96 @@ def download_audio(youtube_url: str, output_path: str = "temp_audio.m4a") -> str
 # Transcribe with Whisper
 def transcribe_with_whisper(audio_path: str) -> dict:
     """Use OpenAI Whisper to transcribe with word-level timing"""
-    print(f"🎙️  Transcribing with Whisper: {audio_path}")
+    print(f"🎙️  Transcribing with Whisper (word-level timing)...")
+    import subprocess
+    import sys
+
+    # Check if whisper is installed
+    try:
+        subprocess.run(["whisper", "--version"], capture_output=True, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        print("❌ Whisper not found. Install: pip install openai-whisper")
+        sys.exit(1)
+
+    # Run Whisper with verbose_json output for word-level timing
     cmd = [
         "whisper",
         audio_path,
-        "--model", "base",  # tiny, base, small, medium, large
-        "--language", "en",  # Fiji English lyrics
-        "--output_format", "json",
+        "--model", "base",
+        "--language", "en",
+        "--output_format", "verbose_json",  # Includes word-level timing
         "--output_dir", "whisper_output"
     ]
     subprocess.run(cmd, check=True)
 
     json_file = Path("whisper_output") / f"{Path(audio_path).stem}.json"
-    with open(json_file) as f:
+    with open(json_file, encoding='utf-8') as f:
         return json.load(f)
 
-# Match lyrics to timing with word-level precision
+# Match lyrics to timing with Whisper's actual word-level data
 def match_lyrics_to_timing(lyrics_text: str, whisper_data: dict) -> list:
     """
-    Match provided lyrics to Whisper's word timings.
+    Match provided lyrics to Whisper's actual word-level timings.
     Returns list of {line, words: [{text, start_time, end_time}]}
     """
-    print("🔄 Matching lyrics to timing (word-level)...")
+    print("🔄 Matching lyrics to timing (Whisper word-level)...")
 
     lyric_lines = [line.strip() for line in lyrics_text.strip().split('\n') if line.strip()]
     segments = whisper_data.get('segments', [])
 
-    timed_lines = []
-    current_line_idx = 0
-    current_words = []
-    word_buffer = []  # Track words for current line
-
+    # Extract all words with their actual timing from Whisper
+    all_words = []
     for segment in segments:
-        text = segment.get('text', '').strip()
-        start = segment.get('start', 0)
-        end = segment.get('end', 0)
+        words = segment.get('words', [])
+        if words:
+            # Whisper provides word-level timing in verbose_json
+            all_words.extend(words)
+        else:
+            # Fallback: estimate if not provided
+            text = segment.get('text', '').strip()
+            if text:
+                start = segment.get('start', 0)
+                end = segment.get('end', 0)
+                word_texts = text.split()
+                if len(word_texts) > 0:
+                    word_duration = (end - start) / len(word_texts)
+                    for i, word_text in enumerate(word_texts):
+                        all_words.append({
+                            'word': word_text,
+                            'start': start + (i * word_duration),
+                            'end': start + ((i + 1) * word_duration)
+                        })
 
-        words = text.split()
-        word_count = len(words)
+    # Normalize word format (Whisper uses 'word'/'start'/'end')
+    normalized_words = [
+        {
+            'text': w.get('word') or w.get('text', ''),
+            'start_time': w.get('start') or w.get('start_time', 0),
+            'end_time': w.get('end') or w.get('end_time', 0)
+        }
+        for w in all_words
+    ]
 
-        # Estimate word timing: divide segment time by word count
-        if word_count > 0:
-            word_duration = (end - start) / word_count
-            for i, word in enumerate(words):
-                word_start = start + (i * word_duration)
-                word_end = start + ((i + 1) * word_duration)
-                word_buffer.append({
-                    'text': word,
-                    'start_time': word_start,
-                    'end_time': word_end
-                })
+    # Match words to lyric lines
+    timed_lines = []
+    word_idx = 0
 
-        # Check if we've completed a lyric line
-        current_text = ' '.join([w['text'] for w in word_buffer])
+    for lyric_line in lyric_lines:
+        target_words = lyric_line.split()
+        line_words = []
 
-        if current_line_idx < len(lyric_lines):
-            target_line = lyric_lines[current_line_idx]
+        for _ in range(len(target_words)):
+            if word_idx < len(normalized_words):
+                line_words.append(normalized_words[word_idx])
+                word_idx += 1
 
-            if target_line.upper() in current_text.upper():
-                # Extract only the words that match this line
-                line_word_count = len(target_line.split())
-                line_words = word_buffer[-line_word_count:] if len(word_buffer) >= line_word_count else word_buffer
-
-                timed_lines.append({
-                    'line': target_line,
-                    'start_time': line_words[0]['start_time'] if line_words else start,
-                    'end_time': line_words[-1]['end_time'] if line_words else end,
-                    'words': line_words
-                })
-                current_line_idx += 1
-                word_buffer = []
+        if line_words:
+            timed_lines.append({
+                'line': lyric_line,
+                'start_time': line_words[0]['start_time'],
+                'end_time': line_words[-1]['end_time'],
+                'words': line_words
+            })
 
     return timed_lines
 
