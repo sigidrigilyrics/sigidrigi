@@ -285,13 +285,19 @@ export default function SingMode() {
           const hasWordTiming = timingData?.words && Array.isArray(timingData.words)
 
           if (hasWordTiming) {
-            // Karaoke: highlight word by word
+            // Karaoke: highlight word by word using actual lyric words + estimated timing
             let currentTime = 0
             if (useYouTube && ytPlayerRef.current) {
               try { currentTime = ytPlayerRef.current.getCurrentTime() || 0 } catch { }
             } else if (audioRef.current && !audioRef.current.paused) {
               currentTime = audioRef.current.currentTime
             }
+
+            // Use actual lyric words (not Whisper's phonetic guesses)
+            const lyricWords = line.split(' ').filter(w => w.length > 0)
+            const lineStart = timingData.start_time
+            const lineEnd = timingData.end_time
+            const lineDuration = lineEnd - lineStart
 
             return (
               <p key={i} className="font-playfair" style={{
@@ -300,9 +306,12 @@ export default function SingMode() {
                 lineHeight: `${lineHeight}px`,
                 marginBottom: 0,
               }}>
-                {timingData.words.map((word, wi) => {
-                  const isActive = currentTime >= word.start_time && currentTime < word.end_time
-                  const isPastWord = currentTime >= word.end_time
+                {lyricWords.map((word, wi) => {
+                  // Estimate each word's time evenly within the line's duration
+                  const wordStart = lineStart + (wi / lyricWords.length) * lineDuration
+                  const wordEnd = lineStart + ((wi + 1) / lyricWords.length) * lineDuration
+                  const isActive = currentTime >= wordStart && currentTime < wordEnd
+                  const isPastWord = currentTime >= wordEnd
                   return (
                     <span key={wi} style={{
                       color: isActive ? 'var(--accent)' : isPastWord ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)',
@@ -310,7 +319,7 @@ export default function SingMode() {
                       transition: 'all 0.1s ease',
                       marginRight: '0.3em'
                     }}>
-                      {word.text}
+                      {word}
                     </span>
                   )
                 })}

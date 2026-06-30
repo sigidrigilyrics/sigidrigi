@@ -49,8 +49,9 @@ def transcribe_with_whisper(audio_path: str) -> dict:
         sys.executable, "-m", "whisper",
         audio_path,
         "--model", "base",
-        "--language", "fj",
-        "--output_format", "verbose_json",
+        "--language", "en",
+        "--output_format", "json",
+        "--word_timestamps", "True",
         "--output_dir", "whisper_output"
     ]
     result = subprocess.run(cmd)
