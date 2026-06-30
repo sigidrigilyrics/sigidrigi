@@ -244,6 +244,12 @@ export default function Admin() {
   const [newEditorEmail, setNewEditorEmail] = useState('')
   const [newEditorName, setNewEditorName] = useState('')
   const [editorSaving, setEditorSaving] = useState(false)
+  const [toast, setToast] = useState('')
+
+  function showToast(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3000)
+  }
 
   // Auto-unlock if logged-in user is a registered editor/admin
   useEffect(() => {
@@ -298,17 +304,20 @@ export default function Admin() {
     setNewEditorEmail('')
     setNewEditorName('')
     setEditorSaving(false)
+    showToast('Editor added')
     loadData()
   }
 
   async function removeEditor(email) {
     await supabase.from('admins').delete().eq('email', email)
+    showToast('Editor removed')
     loadData()
   }
 
   async function handleDelete(id) {
     await supabase.from('songs').delete().eq('id', id)
     setDeleteId(null)
+    showToast('Song deleted')
     loadData()
   }
 
@@ -317,16 +326,19 @@ export default function Admin() {
     const expires = new Date(now)
     expires.setDate(expires.getDate() + 30)
     await supabase.from('members').update({ status: 'active', paid_at: now.toISOString(), expires_at: expires.toISOString() }).eq('id', m.id)
+    showToast(`${m.email} activated — expires in 30 days`)
     loadData()
   }
   async function renewMember(m) {
     const base = m.expires_at && new Date(m.expires_at) > new Date() ? new Date(m.expires_at) : new Date()
     base.setDate(base.getDate() + 30)
     await supabase.from('members').update({ status: 'active', expires_at: base.toISOString() }).eq('id', m.id)
+    showToast(`${m.email} renewed +30 days`)
     loadData()
   }
   async function deactivateMember(m) {
     await supabase.from('members').update({ status: 'expired' }).eq('id', m.id)
+    showToast(`${m.email} deactivated`)
     loadData()
   }
 
@@ -527,7 +539,14 @@ export default function Admin() {
         </div>
       )}
 
-      {showForm && <SongFormSheet song={editSong} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); loadData() }} />}
+      {/* Toast notification */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, padding: '10px 20px', borderRadius: 24, zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', animation: 'fadeInUp 0.2s ease' }}>
+          ✓ {toast}
+        </div>
+      )}
+
+      {showForm && <SongFormSheet song={editSong} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); showToast(editSong ? 'Song updated' : 'Song added'); loadData() }} />}
     </div>
   )
 }
