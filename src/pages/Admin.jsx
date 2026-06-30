@@ -390,6 +390,10 @@ export default function Admin() {
             style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg2)', border: '1px solid var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Camera size={18} color="var(--accent)" />
           </button>
+          <button onClick={() => nav('/lyric-sync')} title="Add song with karaoke timing"
+            style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg2)', border: '1px solid var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Music size={18} color="var(--accent)" />
+          </button>
           <button onClick={() => { setEditSong(null); setShowForm(true) }} title="Add song manually"
             style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Plus size={20} color="#000" />
