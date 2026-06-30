@@ -147,6 +147,8 @@ function SongFormSheet({ song, onClose, onSaved }) {
           </div>
           <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Lyrics</p>
           <textarea style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }} value={form.lyrics || ''} onChange={e => setForm(f => ({ ...f, lyrics: e.target.value }))} />
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Line timings (optional — paste JSON from Lyric Sync)</p>
+          <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} value={typeof form.line_timings === 'string' ? form.line_timings : (form.line_timings ? JSON.stringify(form.line_timings, null, 2) : '')} onChange={e => { try { setForm(f => ({ ...f, line_timings: e.target.value ? JSON.parse(e.target.value) : null })) } catch { /* invalid json, keep as string */ setForm(f => ({ ...f, line_timings: e.target.value })) } }} placeholder='[{"line":"...","start_time":0,"end_time":2}]' />
           <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Music size={13} /> Audio file (MP3 — optional fallback)
           </p>
