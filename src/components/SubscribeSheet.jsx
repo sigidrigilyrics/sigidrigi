@@ -18,6 +18,19 @@ export default function SubscribeSheet({ onClose }) {
   const price = isAnnual ? ANNUAL_PRICE : MEMBERSHIP_PRICE
   const periodLabel = isAnnual ? 'yr' : 'mo'
 
+  // The PayPal button is a fixed-amount link. Annual ($50) only works if a
+  // separate annual PayPal link is configured (app_settings key PayPal_annual);
+  // otherwise hide PayPal for annual so nobody underpays.
+  const annualPaypalLink = paymentDetails['PayPal_annual']
+  const paypalForAnnual = !!annualPaypalLink
+  const visibleMethods = isAnnual && !paypalForAnnual ? methods.filter(m => m !== 'PayPal') : methods
+  const paypalHiddenForAnnual = isAnnual && !paypalForAnnual
+
+  function selectPlan(p) {
+    setPlan(p)
+    if (p === 'annual' && method === 'PayPal' && !paypalForAnnual) setMethod('MPaisa')
+  }
+
   useEffect(() => {
     loadPaymentDetails().then(d => {
       if (!Object.keys(d).length) setPaymentDetailsError(true)
@@ -101,7 +114,7 @@ export default function SubscribeSheet({ onClose }) {
                     Pay <strong>${price} USD</strong> via PayPal{isAnnual ? ' (1 year)' : ''}. Add your reference code in the notes so we can identify your payment.
                   </p>
                   <a
-                    href={paymentDetails['PayPal'] || '#'}
+                    href={(isAnnual ? annualPaypalLink : paymentDetails['PayPal']) || '#'}
                     target="_blank" rel="noopener noreferrer"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#0070ba', color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px', borderRadius: 10, textDecoration: 'none', marginBottom: 8 }}>
                     Pay with PayPal — add "{refCode}" in notes
@@ -148,7 +161,7 @@ export default function SubscribeSheet({ onClose }) {
                 { key: 'monthly', label: 'Monthly', amt: MEMBERSHIP_PRICE, sub: 'per month' },
                 { key: 'annual', label: 'Annual', amt: ANNUAL_PRICE, sub: '2 months free' },
               ].map(p => (
-                <button key={p.key} type="button" onClick={() => setPlan(p.key)}
+                <button key={p.key} type="button" onClick={() => selectPlan(p.key)}
                   style={{
                     flex: 1, textAlign: 'left', cursor: 'pointer', position: 'relative',
                     background: plan === p.key ? 'rgba(0,229,160,0.1)' : 'var(--bg2)',
@@ -168,8 +181,8 @@ export default function SubscribeSheet({ onClose }) {
 
             {/* Payment method */}
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 8 }}>Pay with</p>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-              {methods.map(m => (
+            <div style={{ display: 'flex', gap: 8, marginBottom: paypalHiddenForAnnual ? 8 : 20 }}>
+              {visibleMethods.map(m => (
                 <button key={m} onClick={() => setMethod(m)}
                   style={{
                     flex: 1, background: method === m ? 'rgba(0,229,160,0.1)' : 'var(--bg2)',
@@ -179,6 +192,11 @@ export default function SubscribeSheet({ onClose }) {
                   }}>{m}</button>
               ))}
             </div>
+            {paypalHiddenForAnnual && (
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.5 }}>
+                PayPal is monthly-only for now — choose MPaisa, MyCash or Bank for the annual plan.
+              </p>
+            )}
 
             {subError && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{subError}</p>}
             <button onClick={handleSubscribe} disabled={loading}
