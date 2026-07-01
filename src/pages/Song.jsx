@@ -20,7 +20,7 @@ export default function Song() {
   const [shared, setShared] = useState(false)
   const audioRef = useRef(null)
   const { isFavorite, toggle } = useFavorites()
-  const { isMember } = useMembership()
+  const { isMember, loading: membershipLoading } = useMembership()
   // The free-this-week set needs the whole catalogue cached. On a cold deep-link
   // it may be empty, so warm it before deciding access (else free songs misfire).
   const [catalogReady, setCatalogReady] = useState(!!getCachedCatalog())
@@ -66,7 +66,7 @@ export default function Song() {
 
   const progress = duration ? (currentTime / duration) * 100 : 0
 
-  if (loading || (LOCK_CONTENT && !catalogReady)) return (
+  if (loading || (LOCK_CONTENT && (!catalogReady || membershipLoading))) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text2)' }}>
       Loading…
     </div>

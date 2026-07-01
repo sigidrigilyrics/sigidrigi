@@ -97,6 +97,7 @@ export function canAccess(song, isMember) {
 export function useMembership() {
   const [user, setUser] = useState(null)
   const [member, setMember] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -106,8 +107,13 @@ export function useMembership() {
     if (user && isConfigured) {
       const { data } = await supabase.from('members').select('*').eq('id', user.id).single()
       setMember(data || null)
+      // Admins & editors (the team running the app) always get full access —
+      // they don't buy a membership, but must be able to use every song.
+      const { data: adminRow } = await supabase.from('admins').select('role').eq('email', user.email).single()
+      setIsAdmin(!!adminRow)
     } else {
       setMember(null)
+      setIsAdmin(false)
     }
     setLoading(false)
   }, [])
@@ -118,5 +124,5 @@ export function useMembership() {
     return () => sub?.subscription?.unsubscribe?.()
   }, [load])
 
-  return { user, member, isMember: isActiveMember(member), loading, refresh: load }
+  return { user, member, isAdmin, isMember: isActiveMember(member) || isAdmin, loading, refresh: load }
 }

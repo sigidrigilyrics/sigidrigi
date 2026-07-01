@@ -30,7 +30,7 @@ export default function SingMode() {
   const playStartRef = useRef(null)
   const scrollStartedRef = useRef(false)
   const songRef = useRef(null)
-  const { isMember } = useMembership()
+  const { isMember, loading: membershipLoading } = useMembership()
   const [catalogReady, setCatalogReady] = useState(!!getCachedCatalog())
 
   // Keep songRef current so RAF loop always sees latest song data
@@ -41,8 +41,10 @@ export default function SingMode() {
     if (!catalogReady) loadCatalog().then(() => setCatalogReady(true))
   }, [catalogReady])
 
-  // Paywall: a locked song redirects to the Song page, where the Subscribe CTA lives
-  const locked = LOCK_CONTENT && catalogReady && !!song && !canAccess(song, isMember)
+  // Paywall: a locked song redirects to the Song page, where the Subscribe CTA lives.
+  // Wait for membership to finish loading first — otherwise the cached catalogue makes
+  // `locked` compute with a stale isMember=false and bounces real members/admins out.
+  const locked = LOCK_CONTENT && catalogReady && !membershipLoading && !!song && !canAccess(song, isMember)
   useEffect(() => {
     if (locked) nav(`/song/${id}`, { replace: true })
   }, [locked, id, nav])
@@ -255,7 +257,7 @@ export default function SingMode() {
     }
   }
 
-  if (loading || (LOCK_CONTENT && !catalogReady) || locked) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
+  if (loading || (LOCK_CONTENT && (!catalogReady || membershipLoading)) || locked) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
   if (error) return <div style={{ padding: 20, background: '#070707', color: 'var(--danger)', height: '100vh' }}>{error}</div>
   if (!song) return null
 
