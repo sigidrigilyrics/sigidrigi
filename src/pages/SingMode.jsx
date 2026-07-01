@@ -340,6 +340,9 @@ export default function SingMode() {
               try { currentTime = ytPlayerRef.current.getCurrentTime() || 0 } catch { }
             } else if (audioRef.current && !audioRef.current.paused) {
               currentTime = audioRef.current.currentTime
+            } else if (playStartRef.current && song?.line_timings?.length > 0) {
+              // A-cappella tap-synced: derive time from wall-clock so word highlighting works
+              currentTime = (Date.now() - playStartRef.current) / 1000
             }
 
             // Use actual lyric words (not Whisper's phonetic guesses)
