@@ -53,6 +53,13 @@ export default function SingMode() {
   const ytId = getYouTubeId(song?.instrumental_url)
   const useYouTube = !!ytId && !ytFailed
 
+  // The hidden #yt-player div only mounts once the main UI renders (past the loading
+  // gate below). If we create the player while <Loading> is still showing, it targets a
+  // missing element, onReady never fires, and the backing track silently never plays —
+  // exactly what broke once the gate also began waiting on the membership lookup. Gate
+  // player creation on the same readiness the render uses.
+  const contentReady = !loading && !(LOCK_CONTENT && (!catalogReady || membershipLoading)) && !locked
+
   useEffect(() => {
     pushRecent(id)
     async function load() {
@@ -68,8 +75,9 @@ export default function SingMode() {
   }, [id])
 
   // Hidden YouTube instrumental player — created when the song has a valid instrumental_url
+  // AND the container div is actually on screen (contentReady), never before.
   useEffect(() => {
-    if (!ytId) { setYtReady(false); return }
+    if (!ytId || !contentReady) { setYtReady(false); return }
     let player
     let cancelled = false
     loadYouTubeAPI().then((YT) => {
@@ -94,7 +102,7 @@ export default function SingMode() {
       ytPlayerRef.current = null
       setYtReady(false)
     }
-  }, [ytId])
+  }, [ytId, contentReady])
 
   const lineHeight = 52
 
@@ -257,7 +265,7 @@ export default function SingMode() {
     }
   }
 
-  if (loading || (LOCK_CONTENT && (!catalogReady || membershipLoading)) || locked) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
+  if (!contentReady) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
   if (error) return <div style={{ padding: 20, background: '#070707', color: 'var(--danger)', height: '100vh' }}>{error}</div>
   if (!song) return null
 
