@@ -18,9 +18,11 @@ export default function LoginSheet({ onClose }) {
     setError(null)
     try {
       await signInWithGoogle()
-      // Web redirects away; native returns via deep link and closes the sheet then.
+      // Web navigates away; native hands off to the system browser and returns via a
+      // deep link. Either way, don't leave the button stuck on "Connecting…" forever.
     } catch (err) {
       setError(err.message || 'Google sign-in failed')
+    } finally {
       setGoogleLoading(false)
     }
   }

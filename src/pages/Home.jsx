@@ -40,7 +40,11 @@ export default function Home() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    // React to login/logout so the header stops offering login the moment the
+    // user is authenticated (and shows their initial + routes to Account instead).
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
     fetchSongs()
+    return () => sub?.subscription?.unsubscribe?.()
   }, [])
 
   async function fetchSongs() {
