@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { signInWithGoogle } from '../lib/auth'
@@ -11,6 +11,16 @@ export default function LoginSheet({ onClose }) {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
+
+  // Close the sheet the moment auth succeeds — by any method. Email login also calls
+  // onClose() directly, but native Google finishes asynchronously via the deep-link
+  // callback, so without this the sheet stays open on top of the app after sign-in.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) onClose()
+    })
+    return () => sub?.subscription?.unsubscribe?.()
+  }, [onClose])
 
   async function handleGoogle() {
     if (!isConfigured) { setError('Add Supabase credentials to .env.local to enable login.'); return }
