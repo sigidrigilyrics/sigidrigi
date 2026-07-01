@@ -102,26 +102,39 @@ export function useMembership() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-    if (user && isConfigured) {
-      const { data } = await supabase.from('members').select('*').eq('id', user.id).single()
-      setMember(data || null)
-      // Admins & editors (the team running the app) always get full access —
-      // they don't buy a membership, but must be able to use every song.
-      const { data: adminRow } = await supabase.from('admins').select('role').eq('email', user.email).single()
-      setIsAdmin(!!adminRow)
-    } else {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      if (user && isConfigured) {
+        const { data } = await supabase.from('members').select('*').eq('id', user.id).single()
+        setMember(data || null)
+        // Admins & editors (the team running the app) always get full access —
+        // they don't buy a membership, but must be able to use every song.
+        const { data: adminRow } = await supabase.from('admins').select('role').eq('email', user.email).single()
+        setIsAdmin(!!adminRow)
+      } else {
+        setMember(null)
+        setIsAdmin(false)
+      }
+    } catch {
+      // Degrade to "not a member" rather than throwing — a thrown auth/DB call
+      // must never leave the gate below stuck.
       setMember(null)
       setIsAdmin(false)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
     load()
+    // Safety net: a stalled auth/DB request (connection opened, no response) leaves
+    // the fetch promise pending forever, which would freeze SingMode/Song on their
+    // "Loading…" gate. Force-resolve after a few seconds; a later successful load
+    // still updates the state reactively.
+    const t = setTimeout(() => setLoading(false), 4000)
     const { data: sub } = supabase.auth.onAuthStateChange(() => load())
-    return () => sub?.subscription?.unsubscribe?.()
+    return () => { clearTimeout(t); sub?.subscription?.unsubscribe?.() }
   }, [load])
 
   return { user, member, isAdmin, isMember: isActiveMember(member) || isAdmin, loading, refresh: load }

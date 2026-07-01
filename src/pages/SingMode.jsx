@@ -36,9 +36,15 @@ export default function SingMode() {
   // Keep songRef current so RAF loop always sees latest song data
   songRef.current = song
 
-  // Warm the catalogue so isFreeThisWeek can compute on a cold deep-link
+  // Warm the catalogue so isFreeThisWeek can compute on a cold deep-link. Never let a
+  // stalled catalogue fetch keep the loading gate up forever — proceed after a few
+  // seconds regardless (freeness may be unknown, but the screen won't hang).
   useEffect(() => {
-    if (!catalogReady) loadCatalog().then(() => setCatalogReady(true))
+    if (catalogReady) return
+    let settled = false
+    loadCatalog().then(() => { settled = true; setCatalogReady(true) })
+    const t = setTimeout(() => { if (!settled) setCatalogReady(true) }, 4000)
+    return () => clearTimeout(t)
   }, [catalogReady])
 
   // Paywall: a locked song redirects to the Song page, where the Subscribe CTA lives.

@@ -48,8 +48,14 @@ export default function Song() {
     load()
   }, [id])
 
+  // Never let a stalled catalogue fetch keep the loading gate up forever — proceed
+  // after a few seconds regardless (freeness may be unknown, but nothing hangs).
   useEffect(() => {
-    if (!catalogReady) loadCatalog().then(() => setCatalogReady(true))
+    if (catalogReady) return
+    let settled = false
+    loadCatalog().then(() => { settled = true; setCatalogReady(true) })
+    const t = setTimeout(() => { if (!settled) setCatalogReady(true) }, 4000)
+    return () => clearTimeout(t)
   }, [catalogReady])
 
   function togglePlay() {
