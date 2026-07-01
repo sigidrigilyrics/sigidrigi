@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
+import { FREE_PER_WEEK } from '../lib/membership'
 
 const CONTACT = 'sigidrigilyrics@gmail.com'
 const SITE = 'sigidrigi.vercel.app'
@@ -34,7 +35,7 @@ const PAGES = {
       { h: '3. Subscriptions' },
       { li: [
         'A paid membership ($5 FJD/month) provides full access to the song archive and all platform features including Sing Mode.',
-        '50 songs are available free of charge on a rotating basis.',
+        `${FREE_PER_WEEK} songs are available free of charge on a rotating basis.`,
         'Subscriptions are billed monthly. You may cancel at any time.',
         'Payments are processed via MPaisa, MyCash, PayPal, or bank transfer.',
         'Refunds are handled on a case-by-case basis. Contact us within 7 days of payment if you have an issue.',

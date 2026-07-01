@@ -47,7 +47,7 @@ export function isActiveMember(member) {
 // offline. (The DB `free` flag is ignored on purpose — every song is currently
 // flagged free for testing, which would defeat the rotation. Pin a song as
 // always-free later with `always_free: true`.)
-export const FREE_PER_WEEK = 50
+export const FREE_PER_WEEK = 20
 
 function hash(str) {
   let h = 5381
