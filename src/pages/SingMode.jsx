@@ -105,11 +105,22 @@ export default function SingMode() {
     }).catch(() => {})
     return () => {
       cancelled = true
+      // Stop before destroy — destroy alone can leave the media session lingering
+      // (Android then surfaces it as a floating/PiP player after leaving the page).
+      try { player && player.stopVideo && player.stopVideo() } catch { /* not started */ }
       try { player && player.destroy() } catch { /* already gone */ }
       ytPlayerRef.current = null
       setYtReady(false)
     }
   }, [ytId, contentReady])
+
+  // Pause playback whenever the app/tab goes to the background — a hidden WebView
+  // must never keep the instrumental playing behind other apps.
+  useEffect(() => {
+    function onVisibility() { if (document.hidden) setIsPlaying(false) }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
 
   const lineHeight = 52
 

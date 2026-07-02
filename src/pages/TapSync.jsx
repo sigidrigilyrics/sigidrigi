@@ -68,6 +68,8 @@ export default function TapSync() {
     }).catch(() => {})
     return () => {
       cancelled = true
+      // Stop before destroy so no media session lingers (avoids Android PiP ghosts)
+      try { player && player.stopVideo && player.stopVideo() } catch { /* not started */ }
       try { player && player.destroy() } catch { /* gone */ }
       ytPlayerRef.current = null
       setYtReady(false)
