@@ -1,0 +1,24 @@
+name: Supabase keep-alive
+
+# Free-tier Supabase projects pause after ~1 week of inactivity. If that happens,
+# every user sees "songs not loading". A tiny daily read keeps the project warm.
+on:
+  schedule:
+    - cron: '0 6 * * *' # daily at 06:00 UTC (18:00 Fiji)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the songs endpoint
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/songs?select=id&limit=1")
+          echo "Supabase responded HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Keep-alive ping failed (HTTP $code)"
+            exit 1
+          fi

@@ -5,6 +5,7 @@ import { loadSong, findCachedSong, getCachedCatalog, loadCatalog } from '../lib/
 import { pushRecent } from '../lib/recent'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
 import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
+import LoadingScreen from '../components/LoadingScreen'
 
 export default function SingMode() {
   const { id } = useParams()
@@ -271,7 +272,7 @@ export default function SingMode() {
     }
   }
 
-  if (!contentReady) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#070707', color: 'var(--text2)' }}>Loading…</div>
+  if (!contentReady) return <LoadingScreen background="#070707" onBack={() => nav(-1)} />
   if (error) return <div style={{ padding: 20, background: '#070707', color: 'var(--danger)', height: '100vh' }}>{error}</div>
   if (!song) return null
 

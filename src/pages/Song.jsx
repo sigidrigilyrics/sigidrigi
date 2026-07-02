@@ -6,6 +6,7 @@ import { pushRecent } from '../lib/recent'
 import { useFavorites } from '../lib/favorites'
 import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
 import SubscribeSheet from '../components/SubscribeSheet'
+import LoadingScreen from '../components/LoadingScreen'
 
 export default function Song() {
   const { id } = useParams()
@@ -72,11 +73,7 @@ export default function Song() {
 
   const progress = duration ? (currentTime / duration) * 100 : 0
 
-  if (loading || (LOCK_CONTENT && (!catalogReady || membershipLoading))) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text2)' }}>
-      Loading…
-    </div>
-  )
+  if (loading || (LOCK_CONTENT && (!catalogReady || membershipLoading))) return <LoadingScreen onBack={() => nav(-1)} />
   if (error) return (
     <div style={{ padding: 40, textAlign: 'center' }}>
       <p style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</p>
