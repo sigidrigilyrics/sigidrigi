@@ -26,6 +26,13 @@ export default function TapSync() {
   const [pointer, setPointer] = useState(0)   // index into `lines` of the next line to tap
   const [elapsed, setElapsed] = useState(0)   // live clock display
 
+  // Quick sync: two timestamps (singing starts / song ends) instead of a tap per
+  // line — enough for the exact-pace Sigidrigi scroll. Default mode.
+  const [mode, setMode] = useState('quick')   // 'quick' | 'lines'
+  const [quickStart, setQuickStart] = useState(null)
+  const [quickEnd, setQuickEnd] = useState(null)
+  const [savedNote, setSavedNote] = useState('')
+
   const ytPlayerRef = useRef(null)
   const [ytReady, setYtReady] = useState(false)
   const clockStartRef = useRef(null)
@@ -100,7 +107,8 @@ export default function TapSync() {
   const totalToTap = sungIndices.length
   const done = tappedCount >= totalToTap && totalToTap > 0
 
-  function start() {
+  function start(chosenMode) {
+    if (chosenMode) setMode(chosenMode)
     setStarted(true)
     clockStartRef.current = Date.now()
     if (useYouTube && ytPlayerRef.current) {
@@ -108,6 +116,30 @@ export default function TapSync() {
     } else {
       setIsPlaying(true)
     }
+  }
+
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  function trackDuration() {
+    if (!useYouTube || !ytPlayerRef.current?.getDuration) return 0
+    try { return ytPlayerRef.current.getDuration() || 0 } catch { return 0 }
+  }
+
+  // Save the two quick timestamps. If the sing_end column hasn't been added to the
+  // DB yet, degrade to saving the start only (still improves the song) with a note.
+  async function saveQuick() {
+    if (!isConfigured) { setError('Supabase not configured'); return }
+    setSaving(true)
+    setError('')
+    const payload = { intro: Math.round(quickStart), sing_end: Math.round(quickEnd) }
+    let { error: err } = await supabase.from('songs').update(payload).eq('id', id)
+    if (err && /sing_end/i.test(err.message || '')) {
+      ;({ error: err } = await supabase.from('songs').update({ intro: payload.intro }).eq('id', id))
+      if (!err) setSavedNote('Start saved — the song-end column is missing in Supabase, so run the sing_end SQL once and re-sync to store the end too.')
+    }
+    if (err) { setError(`Save failed: ${err.message}`); setSaving(false); return }
+    setSaved(true)
+    setSaving(false)
   }
 
   function togglePlay() {
@@ -159,6 +191,8 @@ export default function TapSync() {
     setTaps({})
     setPointer(0)
     setElapsed(0)
+    setQuickStart(null)
+    setQuickEnd(null)
     clockStartRef.current = useYouTube ? null : null
     if (useYouTube && ytPlayerRef.current) {
       try { ytPlayerRef.current.seekTo(0); ytPlayerRef.current.pauseVideo() } catch { /* */ }
@@ -249,7 +283,12 @@ export default function TapSync() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' }}>
           <Check size={56} color="var(--accent)" style={{ marginBottom: 14 }} />
           <h2 className="font-playfair" style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>Timing saved!</h2>
-          <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 28 }}>{song.title} now scrolls in sync — {totalToTap} lines.</p>
+          <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: savedNote ? 10 : 28 }}>
+            {mode === 'quick'
+              ? `${song.title} now scrolls at exact pace — singing ${mmss(quickStart || 0)} to ${mmss(quickEnd || 0)}.`
+              : `${song.title} now scrolls in sync — ${totalToTap} lines.`}
+          </p>
+          {savedNote && <p style={{ color: 'var(--gold)', fontSize: 12.5, lineHeight: 1.5, marginBottom: 24 }}>{savedNote}</p>}
           <button onClick={() => nav(`/sing/${id}`)} style={{ width: '100%', maxWidth: 320, background: 'var(--accent)', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 15, padding: '14px', cursor: 'pointer', marginBottom: 10 }}>
             Test in Sing Mode
           </button>
@@ -264,16 +303,93 @@ export default function TapSync() {
             <Music size={38} color="var(--accent)" />
           </div>
           <h2 className="font-playfair" style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>Tap to sync</h2>
-          <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.5, marginBottom: 6 }}>
+          <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.5, marginBottom: 26 }}>
             {useYouTube
-              ? 'The backing track will play. Tap the big button each time a new line starts.'
-              : 'Start the song on YouTube/Spotify (or sing it), then tap the big button as each line begins.'}
+              ? 'The backing track will play. Quick sync needs just 1–2 taps; line-by-line gives full karaoke.'
+              : 'Play the song elsewhere (or sing it). Quick sync needs just 2 taps; line-by-line gives full karaoke.'}
           </p>
-          <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 30 }}>{totalToTap} lines to tap.</p>
-          <button onClick={start} disabled={useYouTube && !ytReady}
-            style={{ width: '100%', maxWidth: 320, background: (useYouTube && !ytReady) ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 14, color: (useYouTube && !ytReady) ? 'var(--text3)' : '#000', fontWeight: 800, fontSize: 16, padding: '16px', cursor: (useYouTube && !ytReady) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            <Play size={20} fill="currentColor" /> {useYouTube ? (ytReady ? 'Start backing track' : 'Loading track…') : 'Start tapping'}
+          <button onClick={() => start('quick')} disabled={useYouTube && !ytReady}
+            style={{ width: '100%', maxWidth: 320, background: (useYouTube && !ytReady) ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 14, color: (useYouTube && !ytReady) ? 'var(--text3)' : '#000', fontWeight: 800, fontSize: 16, padding: '16px', cursor: (useYouTube && !ytReady) ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, marginBottom: 12 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Play size={18} fill="currentColor" /> {useYouTube ? (ytReady ? 'Quick sync' : 'Loading track…') : 'Quick sync'}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.75 }}>Tap when singing starts — done</span>
           </button>
+          <button onClick={() => start('lines')} disabled={useYouTube && !ytReady}
+            style={{ width: '100%', maxWidth: 320, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, color: (useYouTube && !ytReady) ? 'var(--text3)' : 'var(--text)', fontWeight: 700, fontSize: 14, padding: '13px', cursor: (useYouTube && !ytReady) ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <span>Line-by-line karaoke sync</span>
+            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)' }}>{totalToTap} lines to tap</span>
+          </button>
+        </div>
+      ) : mode === 'quick' ? (
+        /* Quick sync session — two timestamps only */
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 8px' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>⚡ Quick sync</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', fontVariantNumeric: 'tabular-nums' }}>{elapsed.toFixed(1)}s</span>
+          </div>
+
+          {/* Captured timestamps */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 28px', textAlign: 'center', gap: 14 }}>
+            <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 340 }}>
+              {[['Singing starts', quickStart], ['Song ends', quickEnd]].map(([label, val]) => (
+                <div key={label} style={{ flex: 1, background: val != null ? 'rgba(0,229,160,0.1)' : 'var(--bg2)', border: `1px solid ${val != null ? 'rgba(0,229,160,0.4)' : 'var(--border)'}`, borderRadius: 14, padding: '14px 10px' }}>
+                  <p className="font-playfair" style={{ fontSize: 26, fontWeight: 800, color: val != null ? 'var(--accent)' : 'var(--text3)', lineHeight: 1 }}>
+                    {val != null ? mmss(val) : '—:—'}
+                  </p>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginTop: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</p>
+                </div>
+              ))}
+            </div>
+            <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
+              {quickStart == null
+                ? 'Listen for the first sung word, then hit the big button.'
+                : quickEnd == null
+                  ? (useYouTube ? 'Tap at the last sung word — or just use the track end.' : 'Tap when the song ends.')
+                  : 'Looks good — save it.'}
+            </p>
+          </div>
+
+          {/* Controls */}
+          <div style={{ padding: '0 20px 36px' }}>
+            {error && <p style={{ color: 'var(--danger)', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>{error}</p>}
+
+            {quickStart == null ? (
+              <button onClick={() => setQuickStart(now())}
+                style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 18, color: '#000', fontWeight: 900, fontSize: 20, padding: '28px', cursor: 'pointer', letterSpacing: '0.04em', marginBottom: 12, boxShadow: '0 8px 30px rgba(0,229,160,0.35)', userSelect: 'none' }}>
+                TAP — SINGING STARTS
+              </button>
+            ) : quickEnd == null ? (
+              <>
+                <button onClick={() => setQuickEnd(Math.max(now(), quickStart + 4))}
+                  style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 18, color: '#000', fontWeight: 900, fontSize: 20, padding: '28px', cursor: 'pointer', letterSpacing: '0.04em', marginBottom: 10, boxShadow: '0 8px 30px rgba(0,229,160,0.35)', userSelect: 'none' }}>
+                  TAP — SONG ENDS
+                </button>
+                {useYouTube && trackDuration() > quickStart + 4 && (
+                  <button onClick={() => setQuickEnd(trackDuration())}
+                    style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: 12, color: 'var(--accent)', fontWeight: 700, fontSize: 14, padding: '13px', cursor: 'pointer', marginBottom: 12 }}>
+                    Ends with the track ({mmss(trackDuration())})
+                  </button>
+                )}
+              </>
+            ) : (
+              <button onClick={saveQuick} disabled={saving}
+                style={{ width: '100%', background: saving ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 18, color: saving ? 'var(--text3)' : '#000', fontWeight: 800, fontSize: 17, padding: '20px', cursor: saving ? 'not-allowed' : 'pointer', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Check size={18} /> {saving ? 'Saving…' : `Save — singing ${mmss(quickStart)} to ${mmss(quickEnd)}`}
+              </button>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={togglePlay} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 12, color: 'var(--text)', fontWeight: 600, fontSize: 13, padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                {isPlaying ? <Pause size={16} /> : <Play size={16} />} {isPlaying ? 'Pause' : 'Resume'}
+              </button>
+              <button onClick={() => { quickEnd != null ? setQuickEnd(null) : setQuickStart(null) }} disabled={quickStart == null}
+                style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 12, color: quickStart == null ? 'var(--text3)' : 'var(--text)', fontWeight: 600, fontSize: 13, padding: '12px', cursor: quickStart == null ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Undo2 size={16} /> Undo
+              </button>
+              <button onClick={restart} style={{ flex: 1, background: 'var(--bg2)', border: 'none', borderRadius: 12, color: 'var(--text)', fontWeight: 600, fontSize: 13, padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <RotateCcw size={16} /> Restart
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         /* Tap session */

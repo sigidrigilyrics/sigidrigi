@@ -229,7 +229,9 @@ function Dashboard({ songs, members, unverified, onActivate, goMembers, nav }) {
   const active = members.filter(isActiveMember)
   const pending = members.filter(m => m.status === 'pending')
   const expiring = active.filter(m => m.expires_at && new Date(m.expires_at) <= in7)
-  const synced = songs.filter(s => Array.isArray(s.line_timings) && s.line_timings.length > 0)
+  // "Timed" = any exact timing: full karaoke line_timings OR quick-sync intro+sing_end
+  const synced = songs.filter(s => (Array.isArray(s.line_timings) && s.line_timings.length > 0)
+    || ((s.intro || 0) > 0 && Number(s.sing_end) > 0))
   const withInstr = songs.filter(s => s.instrumental_url)
   const annualCount = active.filter(m => planDays(m.amount_paid) === 365).length
   // Monthly-equivalent revenue: annual subs amortised over 12 months.
@@ -270,7 +272,7 @@ function Dashboard({ songs, members, unverified, onActivate, goMembers, nav }) {
       <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', margin: '6px 0 10px' }}>Catalogue</p>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
         {statCard(songs.length, 'Songs', 'var(--text)')}
-        {statCard(`${synced.length}`, `Synced · ${syncPct}%`, 'var(--accent)')}
+        {statCard(`${synced.length}`, `Timed · ${syncPct}%`, 'var(--accent)')}
         {statCard(withInstr.length, 'Backing', 'var(--text)')}
         {statCard(unverified.length, 'To verify', unverified.length ? 'var(--gold)' : 'var(--text)')}
       </div>
@@ -294,7 +296,7 @@ function Dashboard({ songs, members, unverified, onActivate, goMembers, nav }) {
             )}
             {(songs.length - synced.length) > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>🎵 {songs.length - synced.length} songs need karaoke sync</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>🎵 {songs.length - synced.length} songs need timing (Quick sync ⏱)</span>
               </div>
             )}
           </div>
@@ -575,6 +577,7 @@ export default function Admin() {
               <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>
                 {song.category} · {song.free ? 'Free' : 'Members'}
                 {song.line_timings?.length > 0 && <span style={{ color: 'var(--accent)' }}> · ✓ synced</span>}
+                {!(song.line_timings?.length > 0) && (song.intro || 0) > 0 && Number(song.sing_end) > 0 && <span style={{ color: 'var(--gold)' }}> · ⏱ timed</span>}
               </p>
             </div>
             <button onClick={() => nav(`/tap-sync/${song.id}`)} title="Tap-sync karaoke timing"

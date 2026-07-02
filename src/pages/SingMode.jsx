@@ -22,6 +22,11 @@ export default function SingMode() {
   const [showControls, setShowControls] = useState(true)
   const [ytReady, setYtReady] = useState(false)
   const [scrollStarted, setScrollStarted] = useState(false)
+  // Two views: 'sheet' (Sigidrigi — plain lyric sheet for the jam circle, steady scroll)
+  // and 'karaoke' (center-stage green active line). Sheet is the everyday default.
+  const [view, setView] = useState(() => { try { return localStorage.getItem('sing_view') || 'sheet' } catch { return 'sheet' } })
+  // Fine-tune for measured songs: live bands drift from the recording's pace
+  const [pace, setPace] = useState(1)
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
   const scrollPosRef = useRef(0)
@@ -158,7 +163,8 @@ export default function SingMode() {
       const dt = (ts - last) / 1000
       last = ts
 
-      const introSecs = songRef.current?.intro || 0
+      const s = songRef.current
+      const introSecs = s?.intro || 0
       const hasIntro = introSecs > 0
 
       // Time source: YouTube → MP3 → BPM clock
@@ -172,16 +178,53 @@ export default function SingMode() {
         if (audio && !audio.paused) { t = audio.currentTime; haveAudioTime = true }
       }
 
-      const lineTimings = songRef.current?.line_timings
+      const lineTimings = s?.line_timings
       const hasLineTimings = lineTimings && Array.isArray(lineTimings) && lineTimings.length > 0
 
-      // Tap-synced song with no audio: drive the timeline from wall-clock since Play
-      if (hasLineTimings && !haveAudioTime) {
+      // Measured singing window — the exact-pace model: singing starts at `intro`,
+      // ends at `sing_end` (or, for YouTube songs, the track's own duration). Scroll
+      // runs linearly between the two; no BPM guessing.
+      let winS = 0, winE = 0
+      if (hasIntro) {
+        winS = introSecs
+        winE = Number(s?.sing_end) || 0
+        if (!(winE > winS) && useYouTube && ytPlayerRef.current?.getDuration) {
+          try { winE = ytPlayerRef.current.getDuration() || 0 } catch { winE = 0 }
+        }
+      }
+      const measured = winE > winS + 3
+      // The sheet view can also derive its window from full line timings
+      if (!measured && hasLineTimings) {
+        winS = lineTimings[0]?.start_time || 0
+        winE = lineTimings[lineTimings.length - 1]?.end_time || 0
+      }
+      const hasWindow = winE > winS + 3
+
+      // Timed song with no audio: drive the timeline from wall-clock since Play
+      if ((hasWindow || hasLineTimings) && !haveAudioTime && playStartRef.current) {
         t = (Date.now() - playStartRef.current) / 1000
       }
 
-      // If song has line_timings, use the timeline to drive currentLine directly
-      if (hasLineTimings && t > 0) {
+      const el = scrollRef.current
+
+      if (view === 'sheet' && hasWindow && el) {
+        // Sigidrigi sheet: scroll the whole sheet proportionally through the window.
+        // Uses real scrollHeight, so wrapped lines and natural spacing are fine.
+        const frac = Math.min(1, Math.max(0, ((t - winS) * pace) / (winE - winS)))
+        const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
+        scrollPosRef.current = frac * maxScroll
+        el.scrollTop = scrollPosRef.current
+      } else if (view === 'karaoke' && measured && t > 0 && el) {
+        // Measured karaoke: exact pace across the line stack, green line follows
+        const maxScroll = Math.max(0, (lines.length - 1) * lineHeight)
+        const speed = (maxScroll / (winE - winS)) * pace
+        scrollPosRef.current = Math.min(maxScroll, Math.max(0, (t - winS) * speed))
+        el.scrollTop = scrollPosRef.current
+        let line = Math.floor(scrollPosRef.current / lineHeight)
+        while (line < lines.length && isHeaderLine(lines[line])) line++
+        setCurrentLine(line)
+      } else if (hasLineTimings && t > 0) {
+        // Tap-synced karaoke: the timeline drives currentLine directly
         let activeLine = 0
         for (let li = 0; li < lineTimings.length; li++) {
           if (t >= lineTimings[li].start_time) activeLine = li
@@ -224,7 +267,7 @@ export default function SingMode() {
     }
     rafRef.current = requestAnimationFrame(step)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [isPlaying, bpm, multiplier, useYouTube])
+  }, [isPlaying, bpm, multiplier, pace, useYouTube, view])
 
   // Auto-hide controls when playing, show when paused or tapped
   useEffect(() => {
@@ -248,6 +291,14 @@ export default function SingMode() {
   function handleScrollStart() {
     scrollStartedRef.current = true
     setScrollStarted(true)
+  }
+
+  function toggleView() {
+    setView(v => {
+      const next = v === 'sheet' ? 'karaoke' : 'sheet'
+      try { localStorage.setItem('sing_view', next) } catch { /* private mode */ }
+      return next
+    })
   }
 
   function handleRestart() {
@@ -292,6 +343,20 @@ export default function SingMode() {
   const activeAudioUrl = song.audio_url
   const hasAudio = !!activeAudioUrl
 
+  // Which lines sit inside a chorus (for the sheet view's subtle tint)
+  const chorusFlags = []
+  {
+    let inChorus = false
+    for (const l of lines) {
+      if (isHeaderLine(l)) { inChorus = /chorus/i.test(l); chorusFlags.push(false) }
+      else chorusFlags.push(inChorus)
+    }
+  }
+
+  // Measured timing available → Pace fine-tune replaces the BPM guess controls
+  const isMeasured = (song.intro || 0) > 0 &&
+    ((Number(song.sing_end) || 0) > (song.intro || 0) + 3 || (useYouTube && ytReady))
+
   return (
     <div onClick={handleScreenTap} style={{ background: '#070707', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {/* Hidden audio element — plays MP3 instrumental in sync with scroll (when no YouTube) */}
@@ -335,9 +400,15 @@ export default function SingMode() {
             )
           })()}
         </div>
-        <button onClick={() => nav(`/tap-sync/${id}`)} title="Tap-sync timing" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center' }}>
-          <Timer size={18} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={e => { e.stopPropagation(); toggleView() }} title="Switch view"
+            style={{ background: view === 'sheet' ? 'rgba(0,229,160,0.14)' : 'rgba(255,255,255,0.08)', border: `1px solid ${view === 'sheet' ? 'rgba(0,229,160,0.5)' : 'rgba(255,255,255,0.18)'}`, borderRadius: 999, color: view === 'sheet' ? 'var(--accent)' : 'var(--text2)', fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', padding: '5px 11px', cursor: 'pointer' }}>
+            {view === 'sheet' ? 'SIGIDRIGI' : 'KARAOKE'}
+          </button>
+          <button onClick={() => nav(`/tap-sync/${id}`)} title="Tap-sync timing" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center' }}>
+            <Timer size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Lyrics scroll — karaoke style with word highlighting */}
@@ -349,6 +420,24 @@ export default function SingMode() {
           const isNext = i === currentLine + 1
           const isPast = i < currentLine
           const isHeader = isHeaderLine(line)
+
+          // Sigidrigi sheet: a plain readable lyric sheet — uniform size, natural
+          // wrapping, chorus subtly tinted. The whole sheet scrolls steadily.
+          if (view === 'sheet') {
+            if (isHeader) return (
+              <p key={i} style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+                color: 'rgba(0,229,160,0.6)', margin: '20px 0 8px',
+              }}>{line}</p>
+            )
+            return (
+              <p key={i} className="font-playfair" style={{
+                fontSize: 19, lineHeight: 1.75, marginBottom: 2,
+                color: chorusFlags[i] ? 'rgba(127,240,200,0.95)' : 'rgba(255,255,255,0.92)',
+                fontStyle: chorusFlags[i] ? 'italic' : 'normal',
+              }}>{line}</p>
+            )
+          }
 
           if (isHeader) return (
             <p key={i} style={{
@@ -410,13 +499,14 @@ export default function SingMode() {
             )
           }
 
-          // Fallback: line-level highlighting
+          // Karaoke: line-level highlighting — the active line in big green letters
           return (
             <p key={i} className="font-playfair" style={{
               fontSize: isCurrent ? 32 : isNext ? 28 : 24,
               fontWeight: isCurrent ? 700 : 500,
               lineHeight: `${lineHeight}px`,
-              color: isCurrent ? 'rgba(255,255,255,1)' : isNext ? 'rgba(255,255,255,0.55)' : isPast ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.35)',
+              color: isCurrent ? 'var(--accent)' : isNext ? 'rgba(255,255,255,0.55)' : isPast ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.35)',
+              textShadow: isCurrent ? '0 0 26px rgba(0,229,160,0.45)' : 'none',
               transition: 'all 0.3s ease',
               marginBottom: 0,
             }}>
@@ -439,7 +529,25 @@ export default function SingMode() {
 
       {/* Control dock */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)', padding: '30px 20px 36px', opacity: showControls ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: showControls ? 'auto' : 'none' }}>
-        {/* BPM + speed row */}
+        {/* Timing row: exact-pace slider for measured songs, BPM guess controls otherwise */}
+        {isMeasured ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+            <div style={{ background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.35)', borderRadius: 12, padding: '10px 14px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)', fontSize: 11, fontWeight: 800, letterSpacing: '0.06em' }}>
+                <Timer size={13} /> EXACT TIMING
+              </span>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>Pace</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{pace.toFixed(2)}×</span>
+              </div>
+              <input type="range" min="0.5" max="1.5" step="0.05" value={pace}
+                onChange={e => setPace(parseFloat(e.target.value))}
+                style={{ accentColor: 'var(--accent)' }} />
+            </div>
+          </div>
+        ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
           <div style={{ background: 'var(--bg2)', borderRadius: 12, padding: '10px 14px', minWidth: 80 }}>
             <span className="font-playfair" style={{ color: 'var(--gold)', fontSize: 26, fontWeight: 700, display: 'block', lineHeight: 1 }}>{bpm}</span>
@@ -459,6 +567,7 @@ export default function SingMode() {
               style={{ accentColor: 'var(--accent)' }} />
           </div>
         </div>
+        )}
 
         {/* Audio error */}
         {audioError && (
