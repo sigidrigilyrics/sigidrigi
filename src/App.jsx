@@ -18,6 +18,10 @@ import Browse from './pages/Browse'
 import Favorites from './pages/Favorites'
 import BottomTabBar from './components/BottomTabBar'
 
+// A login-callback URL can arrive via appUrlOpen AND as the cold-start launch
+// URL; the auth code is single-use, so make sure each URL is handled once.
+const handledLoginUrls = new Set()
+
 function NotFound() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', padding: '0 32px', textAlign: 'center' }}>
@@ -57,17 +61,35 @@ function Layout() {
 
   // OAuth deep-link callback (native app): Google returns to the app via the
   // custom-scheme URL; exchange the code for a session, then land on Account.
+  // Failures are surfaced on the Account page (via sessionStorage) instead of
+  // being swallowed — a silent failure looks like "login just doesn't work".
   useEffect(() => {
-    let handle
-    CapApp.addListener('appUrlOpen', async ({ url }) => {
-      if (!url || !url.includes('login-callback')) return
+    async function handleLoginCallback(url) {
+      if (!url || !url.includes('login-callback') || handledLoginUrls.has(url)) return
+      handledLoginUrls.add(url)
+      let msg = ''
       try {
-        const code = new URL(url).searchParams.get('code')
-        if (code) await supabase.auth.exchangeCodeForSession(code)
-      } catch { /* ignore malformed callback */ }
+        const u = new URL(url)
+        const errDesc = u.searchParams.get('error_description') || u.searchParams.get('error')
+        const code = u.searchParams.get('code')
+        if (errDesc) msg = errDesc
+        else if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) msg = error.message
+        } else msg = 'Google did not return a login code — please try again.'
+      } catch (e) { msg = e?.message || 'Login failed — please try again.' }
+      console.log('[oauth] login-callback result:', msg || 'success')
+      if (msg) { try { sessionStorage.setItem('login_error', msg) } catch { /* ignore */ } }
       try { await Browser.close() } catch { /* nothing to close */ }
       nav('/account')
-    }).then(h => { handle = h }).catch(() => {})
+    }
+
+    let handle
+    CapApp.addListener('appUrlOpen', ({ url }) => handleLoginCallback(url))
+      .then(h => { handle = h }).catch(() => {})
+    // Cold start: if Android killed the app while the user was on Google's page,
+    // the deep link arrives as the launch URL before any listener exists.
+    CapApp.getLaunchUrl().then(r => { if (r?.url) handleLoginCallback(r.url) }).catch(() => {})
     return () => { if (handle) handle.remove() }
   }, [nav])
   return (

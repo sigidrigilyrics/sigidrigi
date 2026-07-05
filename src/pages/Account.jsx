@@ -17,6 +17,14 @@ export default function Account() {
   const [showSubscribe, setShowSubscribe] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [editorRole, setEditorRole] = useState(null)
+  // Surface a failed Google sign-in (stored by the deep-link handler in App.jsx)
+  const [loginError, setLoginError] = useState(() => {
+    try {
+      const msg = sessionStorage.getItem('login_error')
+      if (msg) sessionStorage.removeItem('login_error')
+      return msg || null
+    } catch { return null }
+  })
 
   useEffect(() => {
     loadCatalog().then(({ songs }) => setSongs(songs))
@@ -48,6 +56,18 @@ export default function Account() {
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 4 }}>Bula</p>
         <h1 className="font-playfair" style={{ fontSize: 32, fontWeight: 800 }}>Account</h1>
       </div>
+
+      {/* Failed sign-in notice (from the OAuth deep-link handler) */}
+      {loginError && !user && (
+        <div style={{ margin: '0 20px 14px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.35)', borderRadius: 14, padding: '12px 14px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 3 }}>Sign-in didn't finish</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{loginError}</p>
+          <button onClick={() => { setLoginError(null); setShowLogin(true) }}
+            style={{ marginTop: 8, background: 'var(--danger)', border: 'none', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 12.5, padding: '8px 16px', cursor: 'pointer' }}>
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Profile card */}
       <div style={{ margin: '0 20px 16px', background: 'var(--bg1)', borderRadius: 18, padding: '18px' }}>
