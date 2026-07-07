@@ -133,7 +133,25 @@ function SongFormSheet({ song, onClose, onSaved }) {
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 20px' }} />
         <h2 className="font-playfair" style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>{song?.id ? 'Edit song' : 'Add song'}</h2>
         <form onSubmit={handleSubmit}>
-          {[['Title', 'title'], ['Artist', 'artist'], ['Composer', 'composer'], ['Category', 'category'], ['Province', 'province'], ['Source', 'source'], ['Reference URL (artist video — visible)', 'reference_url'], ['Instrumental (YouTube — hidden in Sing Mode)', 'instrumental_url'], ['Artist Social Link (Instagram, Facebook, TikTok…)', 'social_url'], ['Intro (seconds)', 'intro']].map(([label, field]) => (
+          {[['Title', 'title'], ['Artist', 'artist'], ['Composer', 'composer']].map(([label, field]) => (
+            <div key={field}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>{label}</p>
+              <input style={inputStyle} value={form[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
+            </div>
+          ))}
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Category — Fijian genres</p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {['Sigidrigi', 'Sere ni Lotu', 'Vude', 'Meke', 'Sere ni Loloma', 'Isa (Farewell)', 'Sere ni Vanua', 'Gospel', 'Sere ni Gone', 'Traditional', 'Contemporary'].map(g => (
+                <button key={g} type="button" onClick={() => setForm(f => ({ ...f, category: f.category === g ? '' : g }))}
+                  style={{ background: form.category === g ? 'rgba(0,229,160,0.14)' : 'var(--bg2)', border: form.category === g ? '1px solid var(--accent)' : '1px solid var(--border)', borderRadius: 8, color: form.category === g ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 12.5, padding: '7px 12px', cursor: 'pointer' }}>
+                  {g}
+                </button>
+              ))}
+            </div>
+            <input style={inputStyle} value={form.category || ''} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="or type a custom category" />
+          </div>
+          {[['Province', 'province'], ['Source', 'source'], ['Reference URL (artist video — visible)', 'reference_url'], ['Instrumental (YouTube — hidden in Sing Mode)', 'instrumental_url'], ['Artist Social Link (Instagram, Facebook, TikTok…)', 'social_url'], ['Intro (seconds)', 'intro']].map(([label, field]) => (
             <div key={field}>
               <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>{label}</p>
               <input style={inputStyle} value={form[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
