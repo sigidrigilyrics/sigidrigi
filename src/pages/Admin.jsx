@@ -142,7 +142,8 @@ function SongFormSheet({ song, onClose, onSaved }) {
           <div>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Category — Fijian genres</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {['Sigidrigi', 'Sere ni Lotu', 'Vude', 'Meke', 'Sere ni Loloma', 'Isa (Farewell)', 'Sere ni Vanua', 'Gospel', 'Sere ni Gone', 'Traditional', 'Contemporary'].map(g => (
+              {/* Sere ni Lotu deliberately absent — church songs become a separate FREE section later */}
+              {['Sigidrigi', 'Vude', 'Meke', 'Sere ni Loloma', 'Isa (Farewell)', 'Sere ni Vanua', 'Gospel', 'Sere ni Gone', 'Traditional', 'Contemporary'].map(g => (
                 <button key={g} type="button" onClick={() => setForm(f => ({ ...f, category: f.category === g ? '' : g }))}
                   style={{ background: form.category === g ? 'rgba(0,229,160,0.14)' : 'var(--bg2)', border: form.category === g ? '1px solid var(--accent)' : '1px solid var(--border)', borderRadius: 8, color: form.category === g ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 12.5, padding: '7px 12px', cursor: 'pointer' }}>
                   {g}
