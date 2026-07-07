@@ -67,6 +67,7 @@ function Layout() {
     async function handleLoginCallback(url) {
       if (!url || !url.includes('login-callback') || handledLoginUrls.has(url)) return
       handledLoginUrls.add(url)
+      console.log('[oauth] callback received, exchanging code…')
       let msg = ''
       try {
         const u = new URL(url)
@@ -74,7 +75,10 @@ function Layout() {
         const code = u.searchParams.get('code')
         if (errDesc) msg = errDesc
         else if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          // Hard cap: a hung exchange (network stall, internal auth lock) must never
+          // leave the user stranded on the login sheet with zero feedback.
+          const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Login timed out — check your connection and try again.')), 10000))
+          const { error } = await Promise.race([supabase.auth.exchangeCodeForSession(code), timeout])
           if (error) msg = error.message
         } else msg = 'Google did not return a login code — please try again.'
       } catch (e) { msg = e?.message || 'Login failed — please try again.' }
