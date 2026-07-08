@@ -126,10 +126,10 @@ export default function Song() {
           Traditional · {song.composer || 'Composer unknown'}
         </p>
         <div style={{ display: 'flex', gap: 20 }}>
-          {[['Chords', song.chords], ['Province', song.province], ['Source', song.source], ['BPM', song.bpm]].map(([label, val]) => val ? (
+          {[['Key', song.song_key], ['Province', song.province], ['Source', song.source], ['BPM', song.bpm]].map(([label, val]) => val ? (
             <div key={label}>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 2 }}>{label}</p>
-              <p style={{ fontSize: 13, fontWeight: 600, color: label === 'Chords' ? 'var(--gold)' : 'var(--text)' }}>{val}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: label === 'Key' ? 'var(--gold)' : 'var(--text)' }}>{val}</p>
             </div>
           ) : null)}
         </div>

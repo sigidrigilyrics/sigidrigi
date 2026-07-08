@@ -379,9 +379,9 @@ export default function SingMode() {
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="font-playfair" style={{ fontSize: 18, fontWeight: 600 }}>{song.title}</span>
-          {song.chords && (
+          {song.song_key && (
             <span style={{ background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.45)', borderRadius: 999, color: 'var(--gold)', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', padding: '3px 10px', whiteSpace: 'nowrap' }}>
-              {song.chords}
+              KEY {song.song_key}
             </span>
           )}
           {(useYouTube || hasAudio) && !audioError && (() => {
@@ -420,10 +420,10 @@ export default function SingMode() {
       <div ref={scrollRef}
         style={{ position: 'absolute', inset: 0, overflowY: 'hidden', padding: '20px 20px 20px', textAlign: 'center' }}>
         <div style={{ height: 180 }} />
-        {/* Chords up top of the sheet — the band reads this before the first strum */}
-        {view === 'sheet' && song.chords && (
+        {/* Key up top of the sheet — the band reads this before the first strum */}
+        {view === 'sheet' && song.song_key && (
           <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 18 }}>
-            ♪ {song.chords}
+            KEY OF {song.song_key}
           </p>
         )}
         {lines.map((line, i) => {

@@ -100,7 +100,7 @@ function AudioUploader({ value, onChange, onBpmDetecting, onBpmDetected }) {
 }
 
 function SongFormSheet({ song, onClose, onSaved }) {
-  const [form, setForm] = useState(song || { title: '', artist: '', composer: '', category: '', chords: '', lyrics: '', bpm: '', intro: '', province: '', source: '', reference_url: '', instrumental_url: '', social_url: '', free: false, verified: false, audio_url: '' })
+  const [form, setForm] = useState(song || { title: '', artist: '', composer: '', category: '', song_key: '', lyrics: '', bpm: '', intro: '', province: '', source: '', reference_url: '', instrumental_url: '', social_url: '', free: false, verified: false, audio_url: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [bpmDetecting, setBpmDetecting] = useState(false)
@@ -112,8 +112,8 @@ function SongFormSheet({ song, onClose, onSaved }) {
     setSaving(true)
     setError(null)
     const payload = { ...form, bpm: form.bpm ? parseInt(form.bpm) : null, intro: form.intro ? parseFloat(form.intro) : null }
-    // Don't send an empty chords value — keeps saves working until the chords column exists
-    if (!payload.chords) delete payload.chords
+    // Don't send an empty key — keeps saves working until the song_key column exists
+    if (!payload.song_key) delete payload.song_key
     let err
     if (song?.id) {
       ({ error: err } = await supabase.from('songs').update(payload).eq('id', song.id))
@@ -159,22 +159,16 @@ function SongFormSheet({ song, onClose, onSaved }) {
             </div>
           ))}
           <div>
-            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Chords (so the band doesn't have to guess — tap to build, e.g. G C D)</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Key (so the band doesn't have to guess — usually the first chord, e.g. E or C)</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {['G', 'C', 'D', 'E', 'A', 'F', 'B7', 'Am', 'Dm', 'Em'].map(k => (
-                <button key={k} type="button" onClick={() => setForm(f => ({ ...f, chords: ((f.chords || '') + ' ' + k).trim() }))}
-                  style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--gold)', fontWeight: 700, fontSize: 13, padding: '7px 13px', cursor: 'pointer' }}>
+              {['C', 'D', 'E', 'F', 'G', 'A', 'Am', 'Em'].map(k => (
+                <button key={k} type="button" onClick={() => setForm(f => ({ ...f, song_key: f.song_key === k ? '' : k }))}
+                  style={{ background: form.song_key === k ? 'rgba(255,184,0,0.15)' : 'var(--bg2)', border: form.song_key === k ? '1px solid var(--gold)' : '1px solid var(--border)', borderRadius: 8, color: form.song_key === k ? 'var(--gold)' : 'var(--text2)', fontWeight: 700, fontSize: 13, padding: '7px 13px', cursor: 'pointer' }}>
                   {k}
                 </button>
               ))}
-              {form.chords && (
-                <button type="button" onClick={() => setForm(f => ({ ...f, chords: '' }))}
-                  style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: 8, color: 'var(--danger)', fontWeight: 700, fontSize: 13, padding: '7px 13px', cursor: 'pointer' }}>
-                  ✕ clear
-                </button>
-              )}
             </div>
-            <input style={inputStyle} value={form.chords || ''} onChange={e => setForm(f => ({ ...f, chords: e.target.value }))} placeholder="e.g. G C D — or type any chords (Bb, F#m…)" />
+            <input style={inputStyle} value={form.song_key || ''} onChange={e => setForm(f => ({ ...f, song_key: e.target.value }))} placeholder="or type any key (Bb, F#m…)" />
           </div>
           <div>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
