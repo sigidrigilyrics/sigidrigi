@@ -23,7 +23,22 @@ VITE_SUPABASE_URL=https://toofjmxrvdlhnpnxcpgm.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvb2ZqbXhydmRsaG5wbnhjcGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMjY3NzMsImV4cCI6MjA5NzcwMjc3M30.qsaZpCbnn8EOkAYZVgDXWqN0TnfAFqkbOT-3vfFXvwk
 ```
 
-## Current state — 199 songs live
+## Current state — 205 songs, PAYWALL LIVE (2026-07 update)
+- `LOCK_CONTENT=true`: 20 free songs/week (hash rotation), rest members-only. Google OAuth
+  live (PKCE + deep link `app.sigidrigi.lyrics://login-callback` — registered in
+  AndroidManifest AND ios Info.plist CFBundleURLTypes). Admins bypass the paywall.
+- **Sing screen has TWO VIEWS** (header chip, default Sigidrigi): *Sigidrigi* = plain lyric
+  sheet, steady exact-pace scroll, plays `reference_url` (guide track); *Karaoke* = big green
+  active line, plays `instrumental_url` (falls back to reference). Mute button; pinned KEY chip.
+- **Timing model:** `intro` (singing starts) + `sing_end` (or YT track duration) → linear
+  scroll. Captured via ⏱ Quick Sync (1–2 taps) or line-by-line sync. See `docs/quick-sync-guide.md`.
+- **Admin extras:** genres chip picker (Sigidrigi/Vude/Meke/Isa/Sere ni Vanua/Gospel/Classics/
+  Modern Hits), single Key field (`song_key`), **Queue tab** — editors pull batches of 5
+  (`assigned_to` lock, `catalog_done` flag), no double work.
+- Subscription: manual payments + admin activate, monthly $5/annual $50 FJD (geo-pricing by
+  payment method planned at launch). Editor password `sigiEdit25`.
+
+## Earlier state notes — 199 songs
 **Pages** (`src/pages/`): Home, Song, SingMode, AZIndex, Artists, Account, Admin, Upload,
 Legal (serves /terms, /privacy, /copyright).
 **Key libs** (`src/lib/`):
