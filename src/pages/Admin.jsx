@@ -142,8 +142,9 @@ function SongFormSheet({ song, onClose, onSaved }) {
           <div>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Category — Fijian genres</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {/* Sere ni Lotu deliberately absent — church songs become a separate FREE section later */}
-              {['Sigidrigi', 'Vude', 'Meke', 'Sere ni Loloma', 'Isa (Farewell)', 'Sere ni Vanua', 'Gospel', 'Sere ni Gone', 'Traditional', 'Contemporary'].map(g => (
+              {/* Sere ni Lotu deliberately absent — church songs become a separate FREE section later.
+                  Love/kids are secondary tags (future), not genres. */}
+              {['Sigidrigi', 'Vude', 'Meke', 'Isa (Farewell)', 'Sere ni Vanua', 'Gospel', 'Classics', 'Modern Hits'].map(g => (
                 <button key={g} type="button" onClick={() => setForm(f => ({ ...f, category: f.category === g ? '' : g }))}
                   style={{ background: form.category === g ? 'rgba(0,229,160,0.14)' : 'var(--bg2)', border: form.category === g ? '1px solid var(--accent)' : '1px solid var(--border)', borderRadius: 8, color: form.category === g ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 12.5, padding: '7px 12px', cursor: 'pointer' }}>
                   {g}
@@ -358,6 +359,136 @@ function Dashboard({ songs, members, unverified, onActivate, goMembers, nav }) {
   )
 }
 
+// Cataloging work queue: each editor pulls a batch of 5 songs; a pulled song is
+// locked to that editor (assigned_to) so nobody works the same song twice.
+function QueuePanel({ songs, workerId, onEdit, nav, reload, showToast }) {
+  const [busy, setBusy] = useState(false)
+  const columnsMissing = songs.length > 0 && !('assigned_to' in songs[0])
+
+  const done = songs.filter(s => s.catalog_done)
+  const mine = songs.filter(s => !s.catalog_done && s.assigned_to === workerId)
+  const unclaimed = songs.filter(s => !s.catalog_done && !s.assigned_to)
+  const others = songs.filter(s => !s.catalog_done && s.assigned_to && s.assigned_to !== workerId)
+
+  const byEditor = {}
+  for (const s of done) { if (s.assigned_to) byEditor[s.assigned_to] = (byEditor[s.assigned_to] || 0) + 1 }
+
+  async function pullFive() {
+    setBusy(true)
+    const next = unclaimed.slice(0, 5)
+    // .is('assigned_to', null) = claim-once guard — if another editor grabbed a song
+    // between our load and this click, we simply don't get it (no double work).
+    const { error } = await supabase.from('songs')
+      .update({ assigned_to: workerId })
+      .in('id', next.map(s => s.id))
+      .is('assigned_to', null)
+    if (error) showToast(/assigned_to|catalog_done/.test(error.message) ? 'Run the queue SQL first (see banner)' : error.message)
+    else showToast('Batch pulled — all yours')
+    await reload()
+    setBusy(false)
+  }
+
+  async function markDone(song) {
+    const { error } = await supabase.from('songs').update({ catalog_done: true }).eq('id', song.id)
+    showToast(error ? error.message : `${song.title} done`)
+    reload()
+  }
+
+  async function releaseMine() {
+    await supabase.from('songs').update({ assigned_to: null }).eq('assigned_to', workerId).eq('catalog_done', false)
+    showToast('Batch released back to the pool')
+    reload()
+  }
+
+  const keyOk = s => !!s.song_key
+  const genreOk = s => !!s.category && !['traditional', 'contemporary'].includes((s.category || '').toLowerCase())
+  const timedOk = s => (s.intro || 0) > 0
+  const chip = (ok, label) => (
+    <span key={label} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 8px', borderRadius: 999, background: ok ? 'rgba(0,229,160,0.12)' : 'var(--bg2)', color: ok ? 'var(--accent)' : 'var(--text3)', border: `1px solid ${ok ? 'rgba(0,229,160,0.4)' : 'var(--border)'}` }}>
+      {ok ? '✓ ' : ''}{label}
+    </span>
+  )
+  const pct = songs.length ? Math.round((done.length / songs.length) * 100) : 0
+
+  return (
+    <div style={{ padding: '0 20px' }}>
+      {columnsMissing && (
+        <div style={{ background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.3)', borderRadius: 14, padding: '12px 14px', marginBottom: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>One-time setup needed</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>Run in Supabase SQL Editor:</p>
+          <code style={{ display: 'block', fontSize: 11, color: 'var(--text)', background: 'var(--bg2)', borderRadius: 8, padding: '8px 10px', marginTop: 6, whiteSpace: 'pre-wrap' }}>
+            {'alter table songs add column if not exists assigned_to text;\nalter table songs add column if not exists catalog_done boolean default false;'}
+          </code>
+        </div>
+      )}
+
+      {/* Progress */}
+      <div style={{ background: 'var(--bg1)', borderRadius: 14, padding: '14px 16px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Catalogue progress</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{done.length} / {songs.length} · {pct}%</span>
+        </div>
+        <div style={{ height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width 0.3s' }} />
+        </div>
+        {(Object.keys(byEditor).length > 0 || others.length > 0) && (
+          <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>
+            {Object.entries(byEditor).map(([e, n]) => `${e.split('@')[0]}: ${n} done`).join(' · ')}
+            {others.length > 0 && ` · ${others.length} in progress with others`}
+          </p>
+        )}
+      </div>
+
+      {/* My batch */}
+      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', textTransform: 'uppercase', marginBottom: 10 }}>
+        My batch — {workerId}
+      </p>
+      {mine.length === 0 ? (
+        <div style={{ background: 'var(--bg1)', borderRadius: 14, padding: '24px 16px', textAlign: 'center', marginBottom: 16 }}>
+          <p style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 14 }}>
+            {unclaimed.length === 0 ? 'No unclaimed songs left — catalogue covered.' : `${unclaimed.length} songs waiting. Pull your next 5.`}
+          </p>
+          <button onClick={pullFive} disabled={busy || unclaimed.length === 0 || columnsMissing}
+            style={{ background: (busy || unclaimed.length === 0 || columnsMissing) ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 12, color: (busy || unclaimed.length === 0 || columnsMissing) ? 'var(--text3)' : '#000', fontWeight: 800, fontSize: 15, padding: '13px 34px', cursor: (busy || unclaimed.length === 0) ? 'not-allowed' : 'pointer' }}>
+            {busy ? 'Pulling…' : 'Pull 5 songs'}
+          </button>
+        </div>
+      ) : (
+        <>
+          {mine.map(song => (
+            <div key={song.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</p>
+                <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                  {chip(genreOk(song), 'Genre')}
+                  {chip(keyOk(song), 'Key')}
+                  {chip(timedOk(song), 'Timed')}
+                </div>
+              </div>
+              <button onClick={() => onEdit(song)} title="Edit song (genre, key, lyrics)"
+                style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)', flexShrink: 0 }}>
+                <Pencil size={14} />
+              </button>
+              <button onClick={() => nav(`/tap-sync/${song.id}`)} title="Quick sync timing"
+                style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--bg2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', flexShrink: 0 }}>
+                <Timer size={14} />
+              </button>
+              <button onClick={() => markDone(song)} title="Mark complete"
+                style={{ height: 34, borderRadius: 8, background: 'rgba(0,229,160,0.12)', border: '1px solid rgba(0,229,160,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontWeight: 700, fontSize: 12, padding: '0 14px', flexShrink: 0 }}>
+                Done
+              </button>
+            </div>
+          ))}
+          <button onClick={releaseMine}
+            style={{ marginTop: 14, background: 'none', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text3)', fontWeight: 600, fontSize: 12, padding: '9px 18px', cursor: 'pointer' }}>
+            Release my batch back to the pool
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Admin() {
   const nav = useNavigate()
   const [unlocked, setUnlocked] = useState(false)
@@ -554,7 +685,7 @@ export default function Admin() {
 
       {/* Tab toggle */}
       <div style={{ display: 'flex', gap: 8, padding: '0 20px', marginBottom: 18 }}>
-        {[...(!isEditor ? [['dashboard', 'Home']] : []), ['songs', 'Songs'], ...(!isEditor ? [['members', 'Members'], ['editors', 'Editors']] : [])].map(([id, label]) => (
+        {[...(!isEditor ? [['dashboard', 'Home']] : []), ['songs', 'Songs'], ['queue', 'Queue'], ...(!isEditor ? [['members', 'Members'], ['editors', 'Editors']] : [])].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             style={{ flex: 1, background: tab === id ? 'rgba(0,229,160,0.1)' : 'var(--bg2)', border: tab === id ? '1.5px solid var(--accent)' : '1.5px solid transparent', borderRadius: 10, color: tab === id ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 13, padding: '9px', cursor: 'pointer' }}>
             {label}
@@ -630,6 +761,12 @@ export default function Admin() {
         )}
       </div>
       </>
+      )}
+
+      {tab === 'queue' && (
+        <QueuePanel songs={songs} workerId={loggedInUser?.email || editorName || 'admin'}
+          onEdit={song => { setEditSong(song); setShowForm(true) }}
+          nav={nav} reload={loadData} showToast={showToast} />
       )}
 
       {tab === 'members' && (

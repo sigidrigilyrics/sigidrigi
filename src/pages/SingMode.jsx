@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music, Timer } from 'lucide-react'
+import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music, Timer, Volume2, VolumeX } from 'lucide-react'
 import { loadSong, findCachedSong, getCachedCatalog, loadCatalog } from '../lib/songs'
 import { pushRecent } from '../lib/recent'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
@@ -27,6 +27,9 @@ export default function SingMode() {
   const [view, setView] = useState(() => { try { return localStorage.getItem('sing_view') || 'sheet' } catch { return 'sheet' } })
   // Fine-tune for measured songs: live bands drift from the recording's pace
   const [pace, setPace] = useState(1)
+  // Mute the backing track (the band takes over) — ref so onReady can re-apply it
+  const [muted, setMuted] = useState(false)
+  const mutedRef = useRef(false)
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
   const scrollPosRef = useRef(0)
@@ -61,8 +64,13 @@ export default function SingMode() {
     if (locked) nav(`/song/${id}`, { replace: true })
   }, [locked, id, nav])
 
-  // Hidden YouTube instrumental is the primary backing source when present
-  const ytId = getYouTubeId(song?.instrumental_url)
+  // Backing track depends on the view: the Sigidrigi sheet plays the artist's
+  // ORIGINAL (reference_url — the guide the band follows); Karaoke plays the
+  // karaoke/instrumental track. Each falls back to the other when missing.
+  const activeYtUrl = view === 'sheet'
+    ? (song?.reference_url || song?.instrumental_url)
+    : (song?.instrumental_url || song?.reference_url)
+  const ytId = getYouTubeId(activeYtUrl)
   const useYouTube = !!ytId && !ytFailed
 
   // The hidden #yt-player div only mounts once the main UI renders (past the loading
@@ -89,6 +97,7 @@ export default function SingMode() {
   // Hidden YouTube instrumental player — created when the song has a valid instrumental_url
   // AND the container div is actually on screen (contentReady), never before.
   useEffect(() => {
+    setYtFailed(false) // a failed track in one view must not block the other view's track
     if (!ytId || !contentReady) { setYtReady(false); return }
     let player
     let cancelled = false
@@ -98,7 +107,12 @@ export default function SingMode() {
         videoId: ytId,
         playerVars: { controls: 0, playsinline: 1, rel: 0, modestbranding: 1 },
         events: {
-          onReady: () => { ytPlayerRef.current = player; setYtReady(true) },
+          onReady: () => {
+            ytPlayerRef.current = player
+            // Player recreates on view toggle — keep the user's mute choice
+            if (mutedRef.current) { try { player.mute() } catch { /* not ready */ } }
+            setYtReady(true)
+          },
           onStateChange: (e) => {
             if (e.data === YT.PlayerState.PLAYING) setIsPlaying(true)
             else if (e.data === YT.PlayerState.PAUSED) setIsPlaying(false)
@@ -301,6 +315,17 @@ export default function SingMode() {
     })
   }
 
+  function toggleMute() {
+    setMuted(m => {
+      const next = !m
+      mutedRef.current = next
+      const p = ytPlayerRef.current
+      try { next ? p?.mute?.() : p?.unMute?.() } catch { /* not ready */ }
+      if (audioRef.current) audioRef.current.muted = next
+      return next
+    })
+  }
+
   function handleRestart() {
     scrollPosRef.current = 0
     setCurrentLine(0)
@@ -379,11 +404,6 @@ export default function SingMode() {
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="font-playfair" style={{ fontSize: 18, fontWeight: 600 }}>{song.title}</span>
-          {song.song_key && (
-            <span style={{ background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.45)', borderRadius: 999, color: 'var(--gold)', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', padding: '3px 10px', whiteSpace: 'nowrap' }}>
-              KEY {song.song_key}
-            </span>
-          )}
           {(useYouTube || hasAudio) && !audioError && (() => {
             const c = 'var(--accent)'
             const label = useYouTube ? 'MUSIC' : 'AUDIO'
@@ -416,16 +436,19 @@ export default function SingMode() {
         </div>
       </div>
 
-      {/* Lyrics scroll — karaoke style with word highlighting */}
+      {/* Key — ALWAYS visible (independent of the auto-hiding controls) so the band never guesses */}
+      {song.song_key && (
+        <div style={{ position: 'absolute', top: 104, right: 16, zIndex: 25, pointerEvents: 'none' }}>
+          <span style={{ background: 'rgba(7,7,7,0.8)', border: '1px solid rgba(255,184,0,0.55)', borderRadius: 999, color: 'var(--gold)', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.06em', padding: '6px 14px' }}>
+            KEY {song.song_key}
+          </span>
+        </div>
+      )}
+
+      {/* Lyrics scroll */}
       <div ref={scrollRef}
         style={{ position: 'absolute', inset: 0, overflowY: 'hidden', padding: '20px 20px 20px', textAlign: 'center' }}>
         <div style={{ height: 180 }} />
-        {/* Key up top of the sheet — the band reads this before the first strum */}
-        {view === 'sheet' && song.song_key && (
-          <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 18 }}>
-            KEY OF {song.song_key}
-          </p>
-        )}
         {lines.map((line, i) => {
           const isCurrent = i === currentLine
           const isNext = i === currentLine + 1
@@ -457,60 +480,8 @@ export default function SingMode() {
             }}>{line}</p>
           )
 
-          // Get word-level timing if available
-          const timingData = song?.line_timings?.[i]
-          const hasWordTiming = timingData?.words && Array.isArray(timingData.words)
-
-          if (hasWordTiming) {
-            // Karaoke: highlight word by word using actual lyric words + estimated timing
-            let currentTime = 0
-            if (useYouTube && ytPlayerRef.current) {
-              try { currentTime = ytPlayerRef.current.getCurrentTime() || 0 } catch { }
-            } else if (audioRef.current && !audioRef.current.paused) {
-              currentTime = audioRef.current.currentTime
-            } else if (playStartRef.current && song?.line_timings?.length > 0) {
-              // A-cappella tap-synced: derive time from wall-clock so word highlighting works
-              currentTime = (Date.now() - playStartRef.current) / 1000
-            }
-
-            // Use actual lyric words (not Whisper's phonetic guesses)
-            const lyricWords = line.split(' ').filter(w => w.length > 0)
-            const lineStart = timingData.start_time
-            const lineEnd = timingData.end_time
-            const lineDuration = lineEnd - lineStart
-
-            return (
-              <p key={i} className="font-playfair" style={{
-                fontSize: isCurrent ? 24 : isNext ? 19 : 15,
-                fontWeight: isCurrent ? 800 : 600,
-                lineHeight: `${lineHeight}px`,
-                marginBottom: 0,
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-              }}>
-                {lyricWords.map((word, wi) => {
-                  // Estimate each word's time evenly within the line's duration
-                  const wordStart = lineStart + (wi / lyricWords.length) * lineDuration
-                  const wordEnd = lineStart + ((wi + 1) / lyricWords.length) * lineDuration
-                  const isActive = currentTime >= wordStart && currentTime < wordEnd
-                  const isPastWord = currentTime >= wordEnd
-                  return (
-                    <span key={wi} style={{
-                      color: isActive ? 'var(--accent)' : isPastWord ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)',
-                      textShadow: isActive ? '0 0 20px rgba(0,229,160,0.6)' : 'none',
-                      transition: 'all 0.1s ease',
-                      marginRight: '0.3em'
-                    }}>
-                      {word}
-                    </span>
-                  )
-                })}
-              </p>
-            )
-          }
-
           // Karaoke: line-level highlighting — the active line in big green letters
+          // (word-level highlighting removed on purpose — every song renders the same)
           return (
             <p key={i} className="font-playfair" style={{
               fontSize: isCurrent ? 32 : isNext ? 28 : 24,
@@ -599,6 +570,12 @@ export default function SingMode() {
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}>
             <SkipForward size={24} />
           </button>
+          {(useYouTube || hasAudio) && (
+            <button onClick={toggleMute} aria-label={muted ? 'Unmute track' : 'Mute track'}
+              style={{ background: muted ? 'rgba(255,107,107,0.12)' : 'none', border: muted ? '1px solid rgba(255,107,107,0.4)' : 'none', borderRadius: 10, padding: muted ? '5px 7px' : 0, cursor: 'pointer', color: muted ? 'var(--danger)' : 'var(--text2)', display: 'flex', alignItems: 'center' }}>
+              {muted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+            </button>
+          )}
         </div>
       </div>
     </div>

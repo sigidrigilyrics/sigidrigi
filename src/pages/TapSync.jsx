@@ -303,10 +303,13 @@ export default function TapSync() {
             <Music size={38} color="var(--accent)" />
           </div>
           <h2 className="font-playfair" style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>Tap to sync</h2>
-          <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.5, marginBottom: 26 }}>
+          <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.5, marginBottom: 8 }}>
             {useYouTube
               ? 'The backing track will play. Quick sync needs just 1–2 taps; line-by-line gives full karaoke.'
               : 'Play the song elsewhere (or sing it). Quick sync needs just 2 taps; line-by-line gives full karaoke.'}
+          </p>
+          <p style={{ color: 'var(--gold)', fontSize: 12.5, lineHeight: 1.5, marginBottom: 26 }}>
+            Tap exactly when the FIRST WORD is sung — not when the music starts. Then test in Sing Mode.
           </p>
           <button onClick={() => start('quick')} disabled={useYouTube && !ytReady}
             style={{ width: '100%', maxWidth: 320, background: (useYouTube && !ytReady) ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 14, color: (useYouTube && !ytReady) ? 'var(--text3)' : '#000', fontWeight: 800, fontSize: 16, padding: '16px', cursor: (useYouTube && !ytReady) ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, marginBottom: 12 }}>

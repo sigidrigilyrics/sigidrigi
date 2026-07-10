@@ -17,9 +17,9 @@ function categoryStyle(name) {
   if (n.includes('relig') || n.includes('devot') || n.includes('church') || n.includes('hymn') || n.includes('lotu') || n.includes('gospel')) return { color: '#9B8CFF', Icon: Church }
   if (n.includes('meke')) return { color: '#E0709B', Icon: Users }
   if (n.includes('choir') || n.includes('group')) return { color: '#5BA8F0', Icon: Users }
-  if (n.includes('child') || n.includes('kid') || n.includes('gone')) return { color: '#F0B24B', Icon: Baby }
-  if (n.includes('histor')) return { color: '#C8A24B', Icon: Landmark }
-  if (n.includes('celebr') || n.includes('party') || n.includes('vude')) return { color: '#FFB800', Icon: Sparkles }
+  if (n.includes('child') || n.includes('kid')) return { color: '#F0B24B', Icon: Baby }
+  if (n.includes('classic') || n.includes('histor')) return { color: '#C8A24B', Icon: Landmark }
+  if (n.includes('modern') || n.includes('hit') || n.includes('celebr') || n.includes('party') || n.includes('vude')) return { color: '#FFB800', Icon: Sparkles }
   if (n.includes('farewell') || n.includes('isa')) return { color: '#F0997B', Icon: Sunrise }
   if (n.includes('vanua')) return { color: '#7FB069', Icon: Landmark }
   if (n.includes('welcome') || n.includes('bula')) return { color: '#1DC9A0', Icon: Waves }
