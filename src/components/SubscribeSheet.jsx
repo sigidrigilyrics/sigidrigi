@@ -119,6 +119,9 @@ export default function SubscribeSheet({ onClose }) {
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#0070ba', color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px', borderRadius: 10, textDecoration: 'none', marginBottom: 8 }}>
                     Pay with PayPal — add "{refCode}" in notes
                   </a>
+                  <p style={{ fontSize: 11.5, color: 'var(--text3)', lineHeight: 1.6 }}>
+                    On the PayPal page, tap the yellow <strong>PayPal</strong> button and sign in — the “Debit or Credit Card” option isn’t supported. No PayPal account? Use <strong>MPaisa</strong>, <strong>MyCash</strong> or <strong>Bank</strong> instead.
+                  </p>
                 </>
               ) : method === 'Bank' ? (
                 <>
