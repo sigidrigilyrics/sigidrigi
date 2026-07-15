@@ -3,6 +3,11 @@ import OpenAI from 'openai'
 export const maxDuration = 30
 
 export default async function handler(req, res) {
+  // Allow the native app (served from https://localhost) to call this cross-origin.
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).end()
 
   const { imageBase64, mimeType } = req.body

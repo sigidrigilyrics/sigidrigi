@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { ChevronLeft, Check, AlertCircle, Camera, Music, Loader, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, isConfigured } from '../lib/supabase'
+import { apiUrl } from '../lib/api'
 
 const PROGRESS_MESSAGES = [
   'Downloading audio from YouTube…',
@@ -66,7 +67,7 @@ export default function LyricSync() {
     setOcrError('')
     try {
       const imageBase64 = await compressImage(file)
-      const res = await fetch('/api/transcribe-image', {
+      const res = await fetch(apiUrl('/api/transcribe-image'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64, mimeType: 'image/jpeg' })
@@ -106,7 +107,7 @@ export default function LyricSync() {
         body = { youtubeUrl: youtubeUrl.trim(), lyrics: lyrics.trim(), introSeconds: parseFloat(introSeconds) || 0 }
       }
 
-      const res = await fetch('/api/sync-lyrics', {
+      const res = await fetch(apiUrl('/api/sync-lyrics'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
