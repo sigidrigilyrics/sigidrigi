@@ -13,6 +13,7 @@ import LyricSync from './pages/LyricSync'
 import TapSync from './pages/TapSync'
 import Artists from './pages/Artists'
 import Account from './pages/Account'
+import Welcome from './pages/Welcome'
 import Legal from './pages/Legal'
 import Browse from './pages/Browse'
 import Favorites from './pages/Favorites'
@@ -39,7 +40,7 @@ function Layout() {
   const { pathname } = useLocation()
   const nav = useNavigate()
   const hideNav = pathname.startsWith('/sing') || pathname.startsWith('/admin') || pathname.startsWith('/upload') || pathname.startsWith('/lyric-sync') || pathname.startsWith('/tap-sync')
-    || ['/terms', '/privacy', '/copyright', '/404'].includes(pathname)
+    || ['/terms', '/privacy', '/copyright', '/404', '/welcome'].includes(pathname)
 
   // Admin tools (manage songs, approve members, OCR upload) get a wide desktop
   // layout instead of the phone-width 480px frame the public app uses.
@@ -85,7 +86,9 @@ function Layout() {
       console.log('[oauth] login-callback result:', msg || 'success')
       if (msg) { try { sessionStorage.setItem('login_error', msg) } catch { /* ignore */ } }
       try { await Browser.close() } catch { /* nothing to close */ }
-      nav('/account')
+      // Success → warm welcome screen (auto-continues to Home); failure → Account,
+      // where the "Sign-in didn't finish" banner explains what happened.
+      nav(msg ? '/account' : '/welcome')
     }
 
     let handle
@@ -111,6 +114,7 @@ function Layout() {
         <Route path="/tap-sync/:id" element={<TapSync />} />
         <Route path="/artists" element={<Artists />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/welcome" element={<Welcome />} />
         <Route path="/terms" element={<Legal type="terms" />} />
         <Route path="/privacy" element={<Legal type="privacy" />} />
         <Route path="/copyright" element={<Legal type="copyright" />} />
