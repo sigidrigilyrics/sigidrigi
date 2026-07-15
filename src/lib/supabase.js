@@ -19,7 +19,14 @@ function fetchWithTimeout(input, init = {}, ms = 8000) {
 // PKCE flow so OAuth works on both web (auto-exchange via detectSessionInUrl)
 // and the native app (manual exchangeCodeForSession from the deep-link callback).
 const authOptions = {
-  auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true },
+  auth: {
+    flowType: 'pkce', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true,
+    // supabase-js serializes auth calls through navigator.locks. In the Android WebView
+    // that lock can deadlock when the app is backgrounded mid-OAuth (the Google browser
+    // round-trip), leaving exchangeCodeForSession/getUser queued forever — login "hangs".
+    // One WebView, one client → safe to run auth ops without the lock.
+    lock: async (_name, _acquireTimeout, fn) => await fn(),
+  },
   global: { fetch: (input, init) => fetchWithTimeout(input, init, 8000) },
 }
 
