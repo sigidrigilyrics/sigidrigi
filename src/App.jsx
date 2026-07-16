@@ -81,11 +81,13 @@ function Layout() {
           const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Login timed out — check your connection and try again.')), 10000))
           const { data, error } = await Promise.race([supabase.auth.exchangeCodeForSession(code), timeout])
           if (error) msg = error.message
-          else {
-            // Hand the just-signed-in user forward: getUser() on the Welcome page
-            // can lag behind the exchange in the WebView (users were having to
-            // refresh a few times before it "picked"). This makes it instant.
-            const u = data?.session?.user
+          else if (data?.session) {
+            // exchangeCodeForSession doesn't always persist the session to
+            // localStorage in the Android WebView on first return — the app then
+            // sees "no session" until you refresh, which manually reloads storage.
+            // Set it explicitly so persistence + auth listeners fire right now.
+            try { await supabase.auth.setSession({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }) } catch { /* fall through */ }
+            const u = data.session.user
             const display = u?.user_metadata?.full_name || u?.user_metadata?.name || (u?.email || '').split('@')[0]
             if (display) { try { sessionStorage.setItem('welcome_name', display) } catch { /* ignore */ } }
           }
