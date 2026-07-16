@@ -41,12 +41,22 @@ export default function Home() {
   const heroRef = useRef(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    // Read the user; if null on the first try after a fresh OAuth landing the
+    // session may still be settling in the WebView storage, so retry briefly.
+    // Without this, the header sat on "S" for guests until a manual refresh.
+    let cancelled = false
+    async function readUser(attempt = 0) {
+      const { data } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (data.user) { setUser(data.user); return }
+      if (attempt < 4) setTimeout(() => readUser(attempt + 1), 400)
+    }
+    readUser()
     // React to login/logout so the header stops offering login the moment the
     // user is authenticated (and shows their initial + routes to Account instead).
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
     fetchSongs()
-    return () => sub?.subscription?.unsubscribe?.()
+    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
   }, [])
 
   async function fetchSongs() {

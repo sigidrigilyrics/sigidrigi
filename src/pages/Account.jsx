@@ -40,8 +40,12 @@ export default function Account() {
   }, [user])
 
   async function handleLogout() {
-    await supabase.auth.signOut()
-    refresh()
+    // scope 'local' clears the WebView's own storage promptly (global sometimes
+    // hangs waiting on the server round-trip inside the Android WebView, so the
+    // UI never updates and users think logout is broken)
+    try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* ignore */ }
+    await refresh()
+    nav('/')
   }
 
   const favSongs = favorites.map(id => songs.find(s => s.id === id)).filter(Boolean)

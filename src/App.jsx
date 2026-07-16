@@ -88,7 +88,13 @@ function Layout() {
             // Set it explicitly so persistence + auth listeners fire right now.
             try { await supabase.auth.setSession({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }) } catch { /* fall through */ }
             const u = data.session.user
-            const display = u?.user_metadata?.full_name || u?.user_metadata?.name || (u?.email || '').split('@')[0]
+            // Prefer given_name; else the first word of the full name. Skip the
+            // email prefix entirely — it renders ugly ("sigidrigilyrics").
+            const full = u?.user_metadata?.given_name
+              || u?.user_metadata?.first_name
+              || (u?.user_metadata?.full_name || u?.user_metadata?.name || '').trim().split(/\s+/)[0]
+              || ''
+            const display = full ? full.charAt(0).toUpperCase() + full.slice(1) : ''
             if (display) { try { sessionStorage.setItem('welcome_name', display) } catch { /* ignore */ } }
           }
         } else msg = 'Google did not return a login code — please try again.'
