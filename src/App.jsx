@@ -94,7 +94,10 @@ function Layout() {
               || u?.user_metadata?.first_name
               || (u?.user_metadata?.full_name || u?.user_metadata?.name || '').trim().split(/\s+/)[0]
               || ''
-            const display = full ? full.charAt(0).toUpperCase() + full.slice(1) : ''
+            let display = full ? full.charAt(0).toUpperCase() + full.slice(1) : ''
+            // Accounts named after the app itself (the shared admin account) get the
+            // friendly fallback instead of "Bula vinaka, Sigidrigi"
+            if (/sigidrigi/i.test(display)) display = ''
             if (display) { try { sessionStorage.setItem('welcome_name', display) } catch { /* ignore */ } }
           }
         } else msg = 'Google did not return a login code — please try again.'

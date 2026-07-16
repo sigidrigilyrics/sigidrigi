@@ -36,7 +36,7 @@ export default function Welcome() {
       </div>
       <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 8 }}>Signed in</p>
       <h1 className="font-playfair" style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.15, marginBottom: 10 }}>
-        Bula vinaka{name ? `, ${name}` : ''}!
+        Bula vinaka, {name || 'friend'}!
       </h1>
       <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 30 }}>Welcome to Sigidrigi — taking you to the songs…</p>
       <button onClick={() => nav('/', { replace: true })}
