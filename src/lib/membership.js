@@ -106,11 +106,16 @@ export function useMembership() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
       if (user && isConfigured) {
-        const { data } = await supabase.from('members').select('*').eq('id', user.id).single()
+        // maybeSingle() returns null when there's no row instead of throwing.
+        // With .single() a non-member (very common — admins, brand-new signups)
+        // would throw and the catch below wiped isAdmin to false BEFORE the
+        // admins query even ran — so admins saw "FREE PLAN" and the Subscribe
+        // prompt despite the bypass.
+        const { data } = await supabase.from('members').select('*').eq('id', user.id).maybeSingle()
         setMember(data || null)
         // Admins & editors (the team running the app) always get full access —
         // they don't buy a membership, but must be able to use every song.
-        const { data: adminRow } = await supabase.from('admins').select('role').eq('email', user.email).single()
+        const { data: adminRow } = await supabase.from('admins').select('role').eq('email', user.email).maybeSingle()
         setIsAdmin(!!adminRow)
       } else {
         setMember(null)
