@@ -79,8 +79,16 @@ function Layout() {
           // Hard cap: a hung exchange (network stall, internal auth lock) must never
           // leave the user stranded on the login sheet with zero feedback.
           const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Login timed out — check your connection and try again.')), 10000))
-          const { error } = await Promise.race([supabase.auth.exchangeCodeForSession(code), timeout])
+          const { data, error } = await Promise.race([supabase.auth.exchangeCodeForSession(code), timeout])
           if (error) msg = error.message
+          else {
+            // Hand the just-signed-in user forward: getUser() on the Welcome page
+            // can lag behind the exchange in the WebView (users were having to
+            // refresh a few times before it "picked"). This makes it instant.
+            const u = data?.session?.user
+            const display = u?.user_metadata?.full_name || u?.user_metadata?.name || (u?.email || '').split('@')[0]
+            if (display) { try { sessionStorage.setItem('welcome_name', display) } catch { /* ignore */ } }
+          }
         } else msg = 'Google did not return a login code — please try again.'
       } catch (e) { msg = e?.message || 'Login failed — please try again.' }
       console.log('[oauth] login-callback result:', msg || 'success')

@@ -7,16 +7,24 @@ import { supabase } from '../lib/supabase'
 // the login form. Shows who they're signed in as, then continues to Home.
 export default function Welcome() {
   const nav = useNavigate()
-  const [name, setName] = useState('')
+  // The OAuth handler hands the display name forward via sessionStorage, so this
+  // renders instantly — no waiting on getUser() (which lagged the exchange in the
+  // WebView and made users think login didn't work).
+  const [name] = useState(() => {
+    try {
+      const n = sessionStorage.getItem('welcome_name') || ''
+      if (n) sessionStorage.removeItem('welcome_name')
+      return n
+    } catch { return '' }
+  })
 
   useEffect(() => {
+    // Confirm the session exists in the background — if somehow it doesn't, bail
+    // to Home rather than lie about a login that didn't happen.
     let cancelled = false
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (cancelled) return
-      if (!user) { nav('/', { replace: true }); return }
-      const display = user.user_metadata?.full_name || user.user_metadata?.name || (user.email || '').split('@')[0]
-      setName(display)
-    }).catch(() => nav('/', { replace: true }))
+      if (!cancelled && !user) nav('/', { replace: true })
+    }).catch(() => {})
     const t = setTimeout(() => nav('/', { replace: true }), 2800)
     return () => { cancelled = true; clearTimeout(t) }
   }, [nav])
