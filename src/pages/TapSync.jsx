@@ -308,8 +308,12 @@ export default function TapSync() {
               ? 'The backing track will play. Quick sync needs just 1–2 taps; line-by-line gives full karaoke.'
               : 'Play the song elsewhere (or sing it). Quick sync needs just 2 taps; line-by-line gives full karaoke.'}
           </p>
-          <p style={{ color: 'var(--gold)', fontSize: 12.5, lineHeight: 1.5, marginBottom: 26 }}>
+          <p style={{ color: 'var(--gold)', fontSize: 12.5, lineHeight: 1.5, marginBottom: 10 }}>
             Tap exactly when the FIRST WORD is sung — not when the music starts. Then test in Sing Mode.
+          </p>
+          <p style={{ color: 'var(--text3)', fontSize: 12, lineHeight: 1.5, marginBottom: 26 }}>
+            Quick sync scrolls at a steady average pace, so long instrumental breaks can drift.
+            Use line-by-line when you need tight karaoke — and the Pace slider in Sing Mode to nudge live.
           </p>
           <button onClick={() => start('quick')} disabled={useYouTube && !ytReady}
             style={{ width: '100%', maxWidth: 320, background: (useYouTube && !ytReady) ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 14, color: (useYouTube && !ytReady) ? 'var(--text3)' : '#000', fontWeight: 800, fontSize: 16, padding: '16px', cursor: (useYouTube && !ytReady) ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, marginBottom: 12 }}>

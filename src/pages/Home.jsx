@@ -13,7 +13,7 @@ import LoginSheet from '../components/LoginSheet'
 // Colour + icon per category (graceful default for any unknown name).
 function categoryStyle(name) {
   const n = (name || '').toLowerCase()
-  if (n.includes('love') || n.includes('loloma')) return { color: '#ED93B1', Icon: Heart }
+  if (n.includes('love')) return { color: '#ED93B1', Icon: Heart }
   if (n.includes('relig') || n.includes('devot') || n.includes('church') || n.includes('hymn') || n.includes('lotu') || n.includes('gospel')) return { color: '#9B8CFF', Icon: Church }
   if (n.includes('meke')) return { color: '#E0709B', Icon: Users }
   if (n.includes('choir') || n.includes('group')) return { color: '#5BA8F0', Icon: Users }

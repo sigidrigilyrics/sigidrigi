@@ -51,6 +51,34 @@ For songs that deserve perfect timing (popular ones, songs with long breaks):
 
 This makes the karaoke view follow every line exactly, breaks included.
 
+## The two views (what plays where)
+
+The button at the top-right of the Sing screen switches between two views. They play
+**different tracks**, so fill in both URLs where you can:
+
+| View | Shows | Plays |
+|---|---|---|
+| **SIGIDRIGI** | Plain lyric sheet, steady scroll | The artist's original (reference URL) |
+| **KARAOKE** | One line at a time, big and green | The instrumental / karaoke URL |
+
+If one URL is missing, that view falls back to the other — so a song with only a
+reference recording still works in both. Both views share the same timing: sync once.
+
+The **speaker button** in the controls mutes the track without stopping the scroll —
+that's for when a live band takes over and only needs the words moving.
+
+## Per-song checklist (Admin → Queue)
+
+Before you hit **Done** on a song in the queue:
+
+- [ ] **Genre** set
+- [ ] **Key** set — shows as a gold KEY chip in the Sing screen so the band never guesses
+- [ ] **Timed** — Quick Sync, or line-by-line if it's a song people perform
+- [ ] **Tested** in Sing Mode — the first line lands on the first sung word
+
+Pull 5 songs at a time. They're locked to you while you work, so nobody doubles up.
+"Release my batch" puts them back if you need to stop.
+
 ## Rules of thumb
 
 - Tap on the **first sung word**, always. Anticipate it — you know the song.
