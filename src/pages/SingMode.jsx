@@ -228,8 +228,12 @@ export default function SingMode() {
         const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
         scrollPosRef.current = frac * maxScroll
         el.scrollTop = scrollPosRef.current
-      } else if (view === 'karaoke' && measured && t > 0 && el) {
-        // Measured karaoke: exact pace across the line stack, green line follows
+      } else if (view === 'karaoke' && measured && !hasLineTimings && t > 0 && el) {
+        // Measured karaoke WITHOUT per-line data: steady average pace across the
+        // line stack. Songs that have been line-by-line synced skip this branch —
+        // their exact timestamps (below) always beat the average model, which
+        // drifted through breaks and, when sing_end was empty, stretched the
+        // window to the full video length (outro included).
         const maxScroll = Math.max(0, (lines.length - 1) * lineHeight)
         const speed = (maxScroll / (winE - winS)) * pace
         scrollPosRef.current = Math.min(maxScroll, Math.max(0, (t - winS) * speed))
