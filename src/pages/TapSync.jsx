@@ -7,6 +7,11 @@ import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
 
 const isHeaderLine = (line) => /^(verse|chorus|bridge|outro|pre-?chorus|intro|hook|\[)/i.test(line.trim())
 
+// Human reaction latency: a tap lands ~0.3s AFTER the word it reacts to was
+// sung, so every recorded timestamp ran late by that much and karaoke lines
+// highlighted a beat behind the singer. Subtract it at capture.
+const TAP_LATENCY = 0.3
+
 // Tap-Sync: play the backing track (YouTube) or an external/live source, and
 // tap once as each lyric line begins. We record the exact time per line and
 // save it as line_timings — the same shape Sing Mode reads for karaoke scroll.
@@ -159,7 +164,7 @@ export default function TapSync() {
 
   // Advance the pointer past any header lines, recording the same time for them
   function tap() {
-    const t = now()
+    const t = Math.max(0, now() - TAP_LATENCY)
     // Find the next sung line at/after pointer
     let i = pointer
     while (i < lines.length && isHeaderLine(lines[i])) i++
@@ -360,13 +365,13 @@ export default function TapSync() {
             {error && <p style={{ color: 'var(--danger)', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>{error}</p>}
 
             {quickStart == null ? (
-              <button onClick={() => setQuickStart(now())}
+              <button onClick={() => setQuickStart(Math.max(0, now() - TAP_LATENCY))}
                 style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 18, color: '#000', fontWeight: 900, fontSize: 20, padding: '28px', cursor: 'pointer', letterSpacing: '0.04em', marginBottom: 12, boxShadow: '0 8px 30px rgba(0,229,160,0.35)', userSelect: 'none' }}>
                 TAP — SINGING STARTS
               </button>
             ) : quickEnd == null ? (
               <>
-                <button onClick={() => setQuickEnd(Math.max(now(), quickStart + 4))}
+                <button onClick={() => setQuickEnd(Math.max(now() - TAP_LATENCY, quickStart + 4))}
                   style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 18, color: '#000', fontWeight: 900, fontSize: 20, padding: '28px', cursor: 'pointer', letterSpacing: '0.04em', marginBottom: 10, boxShadow: '0 8px 30px rgba(0,229,160,0.35)', userSelect: 'none' }}>
                   TAP — SONG ENDS
                 </button>
