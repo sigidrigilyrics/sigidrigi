@@ -93,17 +93,29 @@ export function canAccess(song, isMember) {
   return !LOCK_CONTENT || isMember || isFreeThisWeek(song)
 }
 
+// Module-level snapshot of the last successful lookup. Song/SingMode hold their
+// loading gate on this hook, and mounting it fresh on EVERY song open meant a
+// network wait (up to the 4s safety timeout) before any lyrics appeared. With a
+// snapshot, repeat opens render instantly and the lookup refreshes in the
+// background (stale-while-revalidate); an expired membership still drops out
+// reactively when the refresh lands.
+let _snap = null
+
 // Loads the current auth user + their members row; recomputes on auth changes.
 export function useMembership() {
-  const [user, setUser] = useState(null)
-  const [member, setMember] = useState(null)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(_snap ? _snap.user : null)
+  const [member, setMember] = useState(_snap ? _snap.member : null)
+  const [isAdmin, setIsAdmin] = useState(_snap ? _snap.isAdmin : false)
+  const [loading, setLoading] = useState(!_snap)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!_snap) setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      // getSession() reads the persisted session locally — getUser() made a
+      // round-trip to the auth server on every song open (a full RTT of pure
+      // lag for guests, who then hit no other query at all).
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       setUser(user)
       if (user && isConfigured) {
         // maybeSingle() returns null when there's no row instead of throwing.
@@ -111,15 +123,20 @@ export function useMembership() {
         // would throw and the catch below wiped isAdmin to false BEFORE the
         // admins query even ran — so admins saw "FREE PLAN" and the Subscribe
         // prompt despite the bypass.
-        const { data } = await supabase.from('members').select('*').eq('id', user.id).maybeSingle()
-        setMember(data || null)
+        // Both lookups fire in parallel — they were sequential, doubling latency.
         // Admins & editors (the team running the app) always get full access —
         // they don't buy a membership, but must be able to use every song.
-        const { data: adminRow } = await supabase.from('admins').select('role').eq('email', user.email).maybeSingle()
+        const [{ data }, { data: adminRow }] = await Promise.all([
+          supabase.from('members').select('*').eq('id', user.id).maybeSingle(),
+          supabase.from('admins').select('role').eq('email', user.email).maybeSingle(),
+        ])
+        setMember(data || null)
         setIsAdmin(!!adminRow)
+        _snap = { user, member: data || null, isAdmin: !!adminRow }
       } else {
         setMember(null)
         setIsAdmin(false)
+        _snap = { user, member: null, isAdmin: false }
       }
     } catch {
       // Degrade to "not a member" rather than throwing — a thrown auth/DB call
