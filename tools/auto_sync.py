@@ -11,7 +11,7 @@ nothing or hallucinates; demucs energy detection is engine-agnostic.)
 
 Usage:
     python tools/auto_sync.py "<song id or title substring>"
-    python tools/auto_sync.py "Adi Losalini"
+    python tools/auto_sync.py "Adi Losalini" --karaoke   # also export music-minus-vocals .m4a
 
 Output:
     tools/output/<song-id>.json   the line_timings payload (TapSync shape)
@@ -90,10 +90,9 @@ def download_audio(yt_id, dest_dir):
     return files[0]
 
 
-def detect_segments(audio_path):
-    """Isolate the vocal stem with demucs (whisper mis-hears Fijian band
-    recordings entirely — validated on real tracks), then mark sung spans
-    wherever the stem carries energy."""
+def separate(audio_path):
+    """Decode + demucs-split the track. Returns (full_mix, vocal_stem) as
+    float32 (2, N) arrays at 44.1kHz."""
     import numpy as np
     import av
     import torch
@@ -114,8 +113,42 @@ def detect_segments(audio_path):
     model.eval()
     with torch.no_grad():
         out = apply_model(model, torch.from_numpy(wav)[None], split=True, overlap=0.1)[0]
-    mono = out[model.sources.index("vocals")].numpy().mean(axis=0)
+    vocals = out[model.sources.index("vocals")].numpy().astype(np.float32)
+    return wav, vocals
 
+
+def export_karaoke(wav, vocals, path):
+    """Karaoke mix = full mix minus the vocal stem, saved as .m4a (AAC).
+    Encoded with PyAV — torchaudio.save needs torchcodec, which is a pain on
+    Windows."""
+    import numpy as np
+    import av
+
+    inst = np.clip(wav - vocals, -1.0, 1.0).astype(np.float32)
+    out = av.open(str(path), "w")
+    stream = out.add_stream("aac", rate=44100)
+    stream.layout = "stereo"
+    chunk = 1024
+    for i in range(0, inst.shape[1], chunk):
+        frame = av.AudioFrame.from_ndarray(
+            np.ascontiguousarray(inst[:, i : i + chunk]), format="fltp", layout="stereo"
+        )
+        frame.sample_rate = 44100
+        frame.pts = i
+        for pkt in stream.encode(frame):
+            out.mux(pkt)
+    for pkt in stream.encode(None):
+        out.mux(pkt)
+    out.close()
+
+
+def detect_segments(wav, vocals):
+    """Whisper mis-hears Fijian band recordings entirely (validated on real
+    tracks) — instead, mark sung spans wherever the demucs vocal stem carries
+    energy."""
+    import numpy as np
+
+    mono = vocals.mean(axis=0)
     win = int(0.25 * 44100)
     n = len(mono) // win
     rms = np.sqrt((mono[: n * win].reshape(n, win) ** 2).mean(axis=1))
@@ -204,6 +237,8 @@ def build_timings(lyrics, spans):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("query", help="song id or title substring")
+    ap.add_argument("--karaoke", action="store_true",
+                    help="also export the karaoke mix (music minus vocals) as .m4a")
     args = ap.parse_args()
 
     env = load_env()
@@ -229,7 +264,14 @@ def main():
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
         audio = download_audio(yt, td)
-        spans = detect_segments(audio)
+        wav, vocals = separate(audio)
+    spans = detect_segments(wav, vocals)
+
+    if args.karaoke:
+        OUT_DIR.mkdir(exist_ok=True)
+        kpath = OUT_DIR / f"{song['id']}-karaoke.m4a"
+        export_karaoke(wav, vocals, kpath)
+        print(f"Karaoke track (mix minus vocals): tools/output/{kpath.name}")
 
     print(f"{len(spans)} sung spans, {spans[0][0]:.1f}s → {spans[-1][1]:.1f}s")
     timings, first_start, last_end = build_timings(song["lyrics"] or "", spans)
