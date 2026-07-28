@@ -26,9 +26,21 @@ export default defineConfig({
               expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
-          // Supabase (song data) and YouTube (playback) are deliberately left
-          // uncached here — they already degrade via the app's own logic
-          // (localStorage catalogue cache / "connection needed to play").
+          {
+            // Karaoke tracks hosted in Supabase Storage (audio_url, uploaded via
+            // tools/auto_sync.py --karaoke --upload): cache after the first play
+            // so a song sung once works fully offline from then on. The Supabase
+            // REST API (song data) and YouTube playback are deliberately left
+            // uncached — they already degrade via the app's own logic
+            // (localStorage catalogue cache / "connection needed to play").
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'karaoke-audio',
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
       manifest: {
