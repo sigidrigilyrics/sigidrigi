@@ -500,7 +500,12 @@ export default function SingMode() {
             </p>
           )
         })}
-        <div style={{ height: 200 }} />
+        {/* Karaoke needs a tail as tall as the viewport (minus the line's resting
+            position) so the LAST lines can still scroll up to the highlight spot —
+            with a fixed 200px tail, scrollTop clamps a screenful early and the
+            final verse freezes half-hidden behind the controls dock. The sheet
+            keeps a short tail so the song ends with lyrics still on screen. */}
+        <div style={{ height: view === 'sheet' ? 200 : 'calc(100vh - 232px)' }} />
       </div>
 
       {/* Tap to start scroll — shown when playing, no intro/timings set, scroll not yet started */}
