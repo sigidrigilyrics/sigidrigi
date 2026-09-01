@@ -43,14 +43,11 @@ export default defineConfig({
           },
         ],
       },
-      manifest: {
-        name: 'Sigidrigi',
-        short_name: 'Sigidrigi',
-        theme_color: '#0A0A0A',
-        background_color: '#0A0A0A',
-        display: 'standalone',
-        icons: [],
-      },
+      // No manifest on purpose: a web app manifest is what makes Chrome treat the
+      // site as "installable" and show its native install/download banner on open.
+      // That's not wanted here — the real app already ships as the Capacitor APK.
+      // Offline caching (workbox above) works independently of the manifest.
+      manifest: false,
     }),
   ],
 })
