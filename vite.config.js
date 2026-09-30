@@ -1,9 +1,17 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  if (mode === 'android') {
+    const env = loadEnv(mode, process.cwd(), 'VITE_')
+    if (!/^https:\/\/.{10}/.test(env.VITE_SUPABASE_URL || '') ||
+        (env.VITE_SUPABASE_ANON_KEY || '').length <= 20) {
+      throw new Error('Android builds require Supabase client configuration; refusing to package demo songs.')
+    }
+  }
+  return {
   plugins: [
     react(),
     tailwindcss(),
@@ -50,4 +58,5 @@ export default defineConfig({
       manifest: false,
     }),
   ],
+  }
 })

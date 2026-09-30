@@ -12,7 +12,8 @@ jobs:
   debug-apk:
     runs-on: ubuntu-latest
     env:
-      VITE_ADMOB_REWARDED_ID: ${{ secrets.ADMOB_REWARDED_ID }}
+      # Empty selects Google's test rewarded unit in nativeAdMob.js.
+      VITE_ADMOB_REWARDED_ID: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +30,7 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:android
       - name: Run regression tests
         run: node --experimental-vm-modules --test tests/*.test.js
       - name: Check API syntax

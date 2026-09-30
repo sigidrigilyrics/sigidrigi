@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:android": "vite build --mode android",
     "lint": "eslint .",
     "preview": "vite preview",
-    "android": "npm run build && npx cap sync android && npx cap open android"
+    "android": "npm run build:android && npx cap sync android && npx cap open android"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

@@ -26,6 +26,7 @@ dist-ssr
 
 .vercel
 .env*
+!.env.android
 dev-dist
 .gradle
 android/**/build/

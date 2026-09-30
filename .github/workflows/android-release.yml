@@ -38,7 +38,7 @@ jobs:
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           EOF
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:android
       - run: node --experimental-vm-modules --test tests/*.test.js
       - run: npm install --no-save @capacitor-community/admob@^8.0.0
       - run: npx cap sync android

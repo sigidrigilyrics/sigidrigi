@@ -2,9 +2,16 @@
 
 ## Build and signing
 
+Both Android workflows use `npm run build:android`. The tracked `.env.android`
+contains the same public Supabase URL and anonymous client key as the live website,
+so the APK loads the existing catalogue. These are public client settings, not a
+service-role credential. Android builds fail if those settings are empty.
+The debug workflow always selects Google's test rewarded unit; only the release
+workflow reads `ADMOB_REWARDED_ID`.
+
 - [ ] Run the `Android build` GitHub Actions workflow and download the debug APK artifact.
-- [ ] In GitHub repository **Settings → Secrets and variables → Actions**, add `ADMOB_REWARDED_ID` with the production rewarded unit ID. Leave it unset for a test-only build.
-- [ ] Run **Actions → Android build → Run workflow** on `master`; the workflow injects the secret at build time and uploads `app-debug.apk` as an artifact.
+- [ ] In GitHub repository **Settings → Secrets and variables → Actions**, add `ADMOB_REWARDED_ID` with the production rewarded unit ID for release builds.
+- [ ] Run **Actions → Android build → Run workflow** on `master`; the workflow uses test ads and uploads `app-debug.apk` as an artifact.
 - [ ] Install the debug APK on at least one Android 8+ device and test login, song loading, Sing Mode, back navigation, and offline cached songs.
 - [ ] Create a release keystore outside the repository and store its values in GitHub Actions secrets.
 - [ ] Add `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` as GitHub Actions secrets, then run the `Android release bundle` workflow to produce a signed `.aab`.
