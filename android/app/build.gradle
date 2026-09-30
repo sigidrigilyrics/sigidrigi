@@ -10,6 +10,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "app.sigidrigi.lyrics"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildToolsVersion = rootProject.ext.buildToolsVersion
     defaultConfig {
         applicationId "app.sigidrigi.lyrics"
         minSdkVersion rootProject.ext.minSdkVersion

@@ -7,12 +7,14 @@ import { useFavorites } from '../lib/favorites'
 import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
 import SubscribeSheet from '../components/SubscribeSheet'
 import LoadingScreen from '../components/LoadingScreen'
+import { loadYouTubeAPI } from '../lib/youtube'
+import { useAdUnlock } from '../lib/adUnlock'
 
 export default function Song() {
   const { id } = useParams()
   const nav = useNavigate()
-  const [song, setSong] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [song, setSong] = useState(() => findCachedSong(id))
+  const [loading, setLoading] = useState(() => !findCachedSong(id))
   const [error, setError] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -22,9 +24,14 @@ export default function Song() {
   const audioRef = useRef(null)
   const { isFavorite, toggle } = useFavorites()
   const { isMember, loading: membershipLoading } = useMembership()
+  const { unlocked: adUnlocked, watching: adWatching, error: adError, watch: watchAd, remaining: adRemaining } = useAdUnlock(id)
   // The free-this-week set needs the whole catalogue cached. On a cold deep-link
   // it may be empty, so warm it before deciding access (else free songs misfire).
   const [catalogReady, setCatalogReady] = useState(!!getCachedCatalog())
+
+  useEffect(() => {
+    if (song?.reference_url || song?.instrumental_url) loadYouTubeAPI().catch(() => {})
+  }, [song?.reference_url, song?.instrumental_url])
 
   async function handleShare() {
     const url = `${window.location.origin}/song/${id}`
@@ -36,17 +43,21 @@ export default function Song() {
   }
 
   useEffect(() => {
+    let cancelled = false
     pushRecent(id)
     async function load() {
-      setLoading(true)
+      setError(null)
       const cached = findCachedSong(id)
-      if (cached) { setSong(cached); setLoading(false) }
+      setSong(cached)
+      setLoading(!cached)
       const { song } = await loadSong(id)
+      if (cancelled) return
       if (song) setSong(song)
       else if (!cached) setError('Song not found')
       setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   }, [id])
 
   // Never let a stalled catalogue fetch keep the loading gate up forever — proceed
@@ -84,6 +95,9 @@ export default function Song() {
     </div>
   )
   if (!song) return null
+
+  const accessible = canAccess(song, isMember, adUnlocked)
+  const unlockWithAd = async () => { await watchAd() }
 
   const lines = (song.lyrics || '').split('\n')
   const chorusStart = lines.findIndex(l => l.toLowerCase().includes('[chorus]') || l.toLowerCase().includes('chorus:'))
@@ -159,7 +173,7 @@ export default function Song() {
       )}
 
       {/* Sing Mode CTA */}
-      {canAccess(song, isMember) ? (
+      {accessible ? (
         <div style={{ margin: '0 20px 20px' }}>
           <button onClick={() => nav(`/sing/${song.id}`)}
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,229,160,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -169,9 +183,13 @@ export default function Song() {
         </div>
       ) : (
         <div style={{ margin: '0 20px 20px' }}>
-          <button onClick={() => setShowSubscribe(true)}
+          <button onClick={unlockWithAd} disabled={adWatching || adRemaining === 0}
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--gold),#e6a300)', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            🔒 Unlock Sing Mode
+            {adWatching ? 'Loading reward…' : adRemaining ? `▶ Watch an ad to unlock (${adRemaining} left today)` : 'Daily ad unlocks used'}
+          </button>
+          {adError && <p style={{ color: 'var(--danger)', fontSize: 12, textAlign: 'center', marginTop: 8 }}>{adError}</p>}
+          <button onClick={() => setShowSubscribe(true)} style={{ display: 'block', margin: '10px auto 0', background: 'none', border: 'none', color: 'var(--text3)', fontSize: 12, cursor: 'pointer' }}>
+            Become a member for full access
           </button>
         </div>
       )}
@@ -224,7 +242,7 @@ export default function Song() {
 
       {/* Lyrics */}
       <div style={{ padding: '0 20px' }}>
-        {canAccess(song, isMember) ? (
+        {accessible ? (
           <>
             {lines.map((line, i) => {
               const isChorusHeader = line.toLowerCase().includes('[chorus]') || line.toLowerCase().includes('chorus:')
@@ -255,9 +273,11 @@ export default function Song() {
               {lines.length > 6 && (
                 <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>+ {lines.length - 6} more lines</p>
               )}
-              <button onClick={() => setShowSubscribe(true)} style={{ background: 'none', border: '1px solid var(--gold)', borderRadius: 10, color: 'var(--gold)', fontWeight: 600, fontSize: 14, padding: '10px 24px', cursor: 'pointer' }}>
-                🔒 Subscribe to read full lyrics
+              <button onClick={unlockWithAd} disabled={adWatching || adRemaining === 0} style={{ background: 'none', border: '1px solid var(--gold)', borderRadius: 10, color: 'var(--gold)', fontWeight: 600, fontSize: 14, padding: '10px 24px', cursor: 'pointer' }}>
+                {adWatching ? 'Loading reward…' : adRemaining ? `▶ Watch an ad to unlock (${adRemaining} left today)` : 'Daily ad unlocks used'}
               </button>
+              {adError && <p style={{ color: 'var(--danger)', fontSize: 12, marginTop: 8 }}>{adError}</p>}
+              <button onClick={() => setShowSubscribe(true)} style={{ display: 'block', margin: '10px auto 0', background: 'none', border: 'none', color: 'var(--text3)', fontSize: 12, cursor: 'pointer' }}>Become a member for full access</button>
             </div>
           </>
         )}

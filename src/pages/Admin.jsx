@@ -6,8 +6,10 @@ import { MOCK_SONGS } from '../lib/mockData'
 import { isActiveMember, planDays } from '../lib/membership'
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer'
 
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'sigidrigi2025'
-const EDITOR_PASSWORD = import.meta.env.VITE_EDITOR_PASSWORD || 'admin'
+// Password fallback exists only for local demo mode. Production access is
+// granted by the Supabase admins table after the user signs in.
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
+const EDITOR_PASSWORD = import.meta.env.VITE_EDITOR_PASSWORD || ''
 const BUCKET = 'instrumentals'
 
 function AudioUploader({ value, onChange, onBpmDetecting, onBpmDetected }) {
@@ -538,8 +540,8 @@ export default function Admin() {
   }, [])
 
   function unlock() {
-    if (pw === ADMIN_PASSWORD) { setUnlocked(true); setIsEditor(false); setTab('dashboard'); loadData() }
-    else if (pw === EDITOR_PASSWORD) { setUnlocked(true); setIsEditor(true); setEditorName('Editor'); setTab('songs'); loadData() }
+    if (!isConfigured && ADMIN_PASSWORD && pw === ADMIN_PASSWORD) { setUnlocked(true); setIsEditor(false); setTab('dashboard'); loadData() }
+    else if (!isConfigured && EDITOR_PASSWORD && pw === EDITOR_PASSWORD) { setUnlocked(true); setIsEditor(true); setEditorName('Editor'); setTab('songs'); loadData() }
     else setPwError(true)
   }
 
@@ -623,14 +625,14 @@ export default function Admin() {
           </div>
           <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 8 }}>ADMIN</p>
           <h1 className="font-playfair" style={{ fontSize: 28, fontWeight: 800, marginBottom: 24 }}>Manage songs</h1>
-          <input type="password" placeholder="Admin password" value={pw} onChange={e => { setPw(e.target.value); setPwError(false) }}
+          {!isConfigured && <input type="password" placeholder="Demo admin password" value={pw} onChange={e => { setPw(e.target.value); setPwError(false) }}
             onKeyDown={e => e.key === 'Enter' && unlock()}
-            style={{ width: '100%', background: 'var(--bg2)', border: pwError ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 15, padding: '13px 14px', outline: 'none', marginBottom: 12, fontFamily: 'Inter, sans-serif' }} />
-          {pwError && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>Incorrect password</p>}
-          <button onClick={unlock}
+            style={{ width: '100%', background: 'var(--bg2)', border: pwError ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 15, padding: '13px 14px', outline: 'none', marginBottom: 12, fontFamily: 'Inter, sans-serif' }} />}
+          {pwError && !isConfigured && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>Incorrect password</p>}
+          {!isConfigured && <button onClick={unlock}
             style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: 15, padding: '14px', cursor: 'pointer' }}>
-            Enter
-          </button>
+            Enter demo mode
+          </button>}
           {!loggedInUser && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 16px' }}>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase, isConfigured } from '../lib/supabase'
 import { generateReferenceCode, loadPaymentDetails, MEMBERSHIP_PRICE, ANNUAL_PRICE } from '../lib/membership'
+import LoginSheet from './LoginSheet'
 
 export default function SubscribeSheet({ onClose }) {
   const [method, setMethod] = useState('MPaisa')
@@ -12,10 +13,12 @@ export default function SubscribeSheet({ onClose }) {
   const [paymentDetails, setPaymentDetails] = useState({})
   const [paymentDetailsError, setPaymentDetailsError] = useState(false)
   const [subError, setSubError] = useState('')
+  const [showLogin, setShowLogin] = useState(false)
 
   const methods = ['MPaisa', 'MyCash', 'PayPal', 'Bank']
   const isAnnual = plan === 'annual'
   const price = isAnnual ? ANNUAL_PRICE : MEMBERSHIP_PRICE
+  const currency = method === 'PayPal' ? 'USD' : 'FJD'
   const periodLabel = isAnnual ? 'yr' : 'mo'
 
   // The PayPal button is a fixed-amount link. Annual ($50) only works if a
@@ -41,16 +44,19 @@ export default function SubscribeSheet({ onClose }) {
   async function handleSubscribe() {
     setLoading(true)
     setSubError('')
-    let email = ''
-    let userId = null
-    if (isConfigured) {
+    try {
+      if (!isConfigured) throw new Error('Payments are temporarily unavailable. Please try again later.')
       const { data: { user } } = await supabase.auth.getUser()
-      email = user?.email || ''
-      userId = user?.id || null
-    }
-    const code = generateReferenceCode(email)
-    setRefCode(code)
-    if (userId) {
+      if (!user) { setShowLogin(true); return }
+      const { email, id: userId } = user
+      if (method !== 'Bank' && !paymentDetails[method === 'PayPal' && isAnnual ? 'PayPal_annual' : method]) {
+        throw new Error('Payment details are unavailable for this method. Please choose another method or try again later.')
+      }
+      const { data: existing, error: lookupError } = await supabase.from('members').select('status,reference_code').eq('id', userId).maybeSingle()
+      if (lookupError) throw lookupError
+      if (existing?.status === 'active') throw new Error('You already have a membership. Please contact support to renew without interrupting your current access.')
+      const code = existing?.status === 'pending' && existing.reference_code
+        ? existing.reference_code : generateReferenceCode(email)
       const { error } = await supabase.from('members').upsert({
         id: userId,
         email,
@@ -58,18 +64,20 @@ export default function SubscribeSheet({ onClose }) {
         amount_paid: price,
         reference_code: code,
         status: 'pending',
-        notes: isAnnual ? 'Annual plan' : 'Monthly plan',
+        notes: `${isAnnual ? 'Annual' : 'Monthly'} plan — ${currency}`,
         subscribed_at: new Date().toISOString(),
       })
-      if (error) {
-        setSubError('Could not save your request. Please screenshot this screen and WhatsApp us.')
-        setLoading(false)
-        return
-      }
+      if (error) throw error
+      setRefCode(code)
+      setDone(true)
+    } catch (error) {
+      setSubError(error.message || 'Could not save your request. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setDone(true)
-    setLoading(false)
   }
+
+  if (showLogin) return <LoginSheet onClose={() => setShowLogin(false)} />
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
@@ -91,7 +99,7 @@ export default function SubscribeSheet({ onClose }) {
               {done ? 'PAYMENT DETAILS' : 'UNLOCK THE ARCHIVE'}
             </span>
             <h2 className="font-playfair" style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>{done ? 'Almost there!' : 'Become a member'}</h2>
-            <p style={{ fontSize: 13, color: 'var(--text2)' }}>{done ? 'Send your payment, then message us the receipt' : 'Cancel anytime · growing Fijian archive'}</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)' }}>{done ? 'Send your payment, then message us the receipt' : 'Manual payment · no automatic renewal'}</p>
           </div>
           <button onClick={onClose} style={{ background: 'var(--bg2)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)', flexShrink: 0 }}>
             <X size={16} />
@@ -175,12 +183,12 @@ export default function SubscribeSheet({ onClose }) {
                     <span style={{ position: 'absolute', top: -8, right: 10, background: 'var(--gold)', color: '#000', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 999, letterSpacing: '0.04em' }}>BEST VALUE</span>
                   )}
                   <span style={{ display: 'block', fontWeight: 700, fontSize: 13, color: plan === p.key ? 'var(--accent)' : 'var(--text)' }}>{p.label}</span>
-                  <span style={{ display: 'block', fontWeight: 800, fontSize: 20, marginTop: 2 }}>${p.amt}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)' }}> FJD</span></span>
+                  <span style={{ display: 'block', fontWeight: 800, fontSize: 20, marginTop: 2 }}>${p.amt}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)' }}> {currency}</span></span>
                   <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{p.sub}</span>
                 </button>
               ))}
             </div>
-            <p style={{ color: 'var(--text2)', fontSize: 12.5, lineHeight: 1.6, marginBottom: 18 }}>Full access to the whole archive + Sing Mode with backing tracks. Cancel anytime.</p>
+            <p style={{ color: 'var(--text2)', fontSize: 12.5, lineHeight: 1.6, marginBottom: 18 }}>Full access to the whole archive + Sing Mode with backing tracks. No automatic renewal.</p>
 
             {/* Payment method */}
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 8 }}>Pay with</p>
@@ -204,7 +212,7 @@ export default function SubscribeSheet({ onClose }) {
             {subError && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{subError}</p>}
             <button onClick={handleSubscribe} disabled={loading}
               style={{ width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-dark))', border: 'none', borderRadius: 14, color: '#000', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer', boxShadow: '0 8px 22px rgba(0,229,160,0.3)', marginBottom: 12 }}>
-              {loading ? 'Submitting…' : `Get membership — $${price}/${periodLabel}`}
+              {loading ? 'Submitting…' : `Get membership — ${price} ${currency}/${periodLabel}`}
             </button>
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>Payments are confirmed manually during early access. You'll get a reference code + payment details next.</p>
           </>

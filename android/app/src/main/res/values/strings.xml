@@ -4,4 +4,5 @@
     <string name="title_activity_main">sigidrigi</string>
     <string name="package_name">app.sigidrigi.lyrics</string>
     <string name="custom_url_scheme">app.sigidrigi.lyrics</string>
+    <string name="admob_app_id">ca-app-pub-6230395366899025~5840831600</string>
 </resources>

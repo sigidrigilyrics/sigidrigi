@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.npm-cache
 dist
 dist-ssr
 *.local
@@ -26,3 +27,9 @@ dist-ssr
 .vercel
 .env*
 dev-dist
+.gradle
+android/**/build/
+android/local.properties
+android/key.properties
+android/release.keystore
+android/release-keystore-recovery.txt

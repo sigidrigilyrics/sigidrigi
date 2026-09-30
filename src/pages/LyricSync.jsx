@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { ChevronLeft, Check, AlertCircle, Camera, Music, Loader, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, isConfigured } from '../lib/supabase'
+import { supabase, isConfigured, authHeaders } from '../lib/supabase'
 import { apiUrl } from '../lib/api'
 
 const PROGRESS_MESSAGES = [
@@ -69,7 +69,7 @@ export default function LyricSync() {
       const imageBase64 = await compressImage(file)
       const res = await fetch(apiUrl('/api/transcribe-image'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ imageBase64, mimeType: 'image/jpeg' })
       })
       const data = await res.json()
@@ -109,7 +109,7 @@ export default function LyricSync() {
 
       const res = await fetch(apiUrl('/api/sync-lyrics'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify(body)
       })
       const data = await res.json()

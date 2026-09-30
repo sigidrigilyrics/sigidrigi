@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, isConfigured } from './supabase'
 import { getCachedCatalog } from './songs'
+import { hasAdUnlock } from './adUnlock'
 
 // ── Master paywall flag ──────────────────────────────────────────────
 // While false, EVERY song stays open (testing / content-loading phase).
@@ -89,8 +90,8 @@ export function isFreeThisWeek(song) {
 
 // Whether a song is accessible to the current user.
 // While LOCK_CONTENT is false this is always true (nothing is gated yet).
-export function canAccess(song, isMember) {
-  return !LOCK_CONTENT || isMember || isFreeThisWeek(song)
+export function canAccess(song, isMember, adUnlocked = song && hasAdUnlock(song.id)) {
+  return !LOCK_CONTENT || isMember || isFreeThisWeek(song) || adUnlocked
 }
 
 // Module-level snapshot of the last successful lookup. Song/SingMode hold their
@@ -103,18 +104,21 @@ let _snap = null
 
 // Loads the current auth user + their members row; recomputes on auth changes.
 export function useMembership() {
+  const requestVersion = useRef(0)
   const [user, setUser] = useState(_snap ? _snap.user : null)
   const [member, setMember] = useState(_snap ? _snap.member : null)
   const [isAdmin, setIsAdmin] = useState(_snap ? _snap.isAdmin : false)
   const [loading, setLoading] = useState(!_snap)
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current
     if (!_snap) setLoading(true)
     try {
       // getSession() reads the persisted session locally — getUser() made a
       // round-trip to the auth server on every song open (a full RTT of pure
       // lag for guests, who then hit no other query at all).
       const { data: { session } } = await supabase.auth.getSession()
+      if (version !== requestVersion.current) return
       const user = session?.user ?? null
       setUser(user)
       if (user && isConfigured) {
@@ -130,6 +134,7 @@ export function useMembership() {
           supabase.from('members').select('*').eq('id', user.id).maybeSingle(),
           supabase.from('admins').select('role').eq('email', user.email).maybeSingle(),
         ])
+        if (version !== requestVersion.current) return
         setMember(data || null)
         setIsAdmin(!!adminRow)
         _snap = { user, member: data || null, isAdmin: !!adminRow }
@@ -139,12 +144,13 @@ export function useMembership() {
         _snap = { user, member: null, isAdmin: false }
       }
     } catch {
+      if (version !== requestVersion.current) return
       // Degrade to "not a member" rather than throwing — a thrown auth/DB call
       // must never leave the gate below stuck.
       setMember(null)
       setIsAdmin(false)
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
   }, [])
 
@@ -155,8 +161,24 @@ export function useMembership() {
     // "Loading…" gate. Force-resolve after a few seconds; a later successful load
     // still updates the state reactively.
     const t = setTimeout(() => setLoading(false), 4000)
-    const { data: sub } = supabase.auth.onAuthStateChange(() => load())
-    return () => { clearTimeout(t); sub?.subscription?.unsubscribe?.() }
+    let authTimer
+    const invalidateRequest = () => { requestVersion.current++ }
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // Never call Supabase again inside its auth callback: defer until the
+      // callback has returned, and discard the previous account's access.
+      if (event === 'INITIAL_SESSION') return
+      if (session?.user?.id !== _snap?.user?.id) {
+        requestVersion.current++
+        _snap = null
+        setMember(null)
+        setIsAdmin(false)
+        setUser(session?.user ?? null)
+        setLoading(!!session)
+      }
+      clearTimeout(authTimer)
+      authTimer = setTimeout(() => { load() }, 0)
+    })
+    return () => { invalidateRequest(); clearTimeout(t); clearTimeout(authTimer); sub?.subscription?.unsubscribe?.() }
   }, [load])
 
   return { user, member, isAdmin, isMember: isActiveMember(member) || isAdmin, loading, refresh: load }

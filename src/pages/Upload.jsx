@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Camera, Check, Music, Loader, AlertCircle } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, authHeaders } from '../lib/supabase'
 import { apiUrl } from '../lib/api'
 
 const BUCKET = 'instrumentals'
@@ -56,7 +56,7 @@ export default function Upload() {
         const imageBase64 = await compressImage(file)
         const res = await fetch(apiUrl('/api/transcribe-image'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({ imageBase64, mimeType: 'image/jpeg' })
         })
         const data = await res.json()

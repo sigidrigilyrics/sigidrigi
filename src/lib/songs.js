@@ -5,19 +5,25 @@ import { MOCK_SONGS } from './mockData'
 // The full catalogue (lyrics included) is small enough to keep in localStorage:
 // ~200 songs ≈ 400KB, well under the ~5MB limit, scales fine toward 1,000.
 const CACHE_KEY = 'sigidrigi_catalog_v1'
+let memoryCatalog = null
+let catalogRequest = null
+const songRequests = new Map()
 
 export function getCachedCatalog() {
+  if (memoryCatalog) return memoryCatalog
   try {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { songs } = JSON.parse(raw)
-    return Array.isArray(songs) ? songs : null
+    memoryCatalog = Array.isArray(songs) ? songs : null
+    return memoryCatalog
   } catch {
     return null
   }
 }
 
 function setCachedCatalog(songs) {
+  memoryCatalog = songs
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), songs }))
   } catch {
@@ -31,8 +37,19 @@ export function findCachedSong(id) {
 }
 
 // Returns { songs, offline }. Tries network, caches on success, falls back to cache offline.
-export async function loadCatalog() {
-  if (!isConfigured) return { songs: MOCK_SONGS, offline: false }
+export function loadCatalog() {
+  if (!catalogRequest) catalogRequest = fetchCatalog().finally(() => { catalogRequest = null })
+  return catalogRequest
+}
+
+export function cacheSong(song) {
+  const catalog = getCachedCatalog()
+  if (!catalog) return
+  setCachedCatalog(catalog.map(item => String(item.id) === String(song.id) ? song : item))
+}
+
+async function fetchCatalog() {
+  if (!isConfigured) { setCachedCatalog(MOCK_SONGS); return { songs: MOCK_SONGS, offline: false } }
   try {
     const { data, error } = await supabase.from('songs').select('*').order('title')
     if (error) throw error
@@ -45,13 +62,22 @@ export async function loadCatalog() {
 }
 
 // Returns { song, offline }. Network-fresh when online, cache when not.
-export async function loadSong(id) {
+export function loadSong(id) {
+  const key = String(id)
+  if (!songRequests.has(key)) {
+    songRequests.set(key, fetchSong(id).finally(() => songRequests.delete(key)))
+  }
+  return songRequests.get(key)
+}
+
+async function fetchSong(id) {
   if (!isConfigured) {
     return { song: MOCK_SONGS.find(s => String(s.id) === String(id)) || null, offline: false }
   }
   try {
     const { data, error } = await supabase.from('songs').select('*').eq('id', id).single()
     if (error) throw error
+    cacheSong(data)
     return { song: data, offline: false }
   } catch {
     const cached = findCachedSong(id)

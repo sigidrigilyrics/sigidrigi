@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { X, SkipBack, Play, Pause, SkipForward, Minus, Plus, Music, Timer, Volume2, VolumeX } from 'lucide-react'
 import { loadSong, findCachedSong, getCachedCatalog, loadCatalog } from '../lib/songs'
@@ -6,12 +6,16 @@ import { pushRecent } from '../lib/recent'
 import { getYouTubeId, loadYouTubeAPI } from '../lib/youtube'
 import { useMembership, canAccess, LOCK_CONTENT } from '../lib/membership'
 import LoadingScreen from '../components/LoadingScreen'
+import { activeLyricLine, backingTrack } from '../lib/timing'
+import { useAdUnlock } from '../lib/adUnlock'
+
+const isHeaderLine = (line) => /^(verse|chorus|bridge|outro|pre-?chorus|intro|hook|\[)/i.test(line.trim())
 
 export default function SingMode() {
   const { id } = useParams()
   const nav = useNavigate()
-  const [song, setSong] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [song, setSong] = useState(() => findCachedSong(id))
+  const [loading, setLoading] = useState(() => !findCachedSong(id))
   const [error, setError] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [bpm, setBpm] = useState(72)
@@ -37,13 +41,16 @@ export default function SingMode() {
   const hideTimerRef = useRef(null)
   const ytPlayerRef = useRef(null)
   const playStartRef = useRef(null)
+  const elapsedRef = useRef(0)
   const scrollStartedRef = useRef(false)
   const songRef = useRef(null)
   const { isMember, loading: membershipLoading } = useMembership()
+  const { unlocked: adUnlocked } = useAdUnlock(id)
   const [catalogReady, setCatalogReady] = useState(!!getCachedCatalog())
 
   // Keep songRef current so RAF loop always sees latest song data
-  songRef.current = song
+  useEffect(() => { songRef.current = song }, [song])
+  const lines = useMemo(() => (song?.lyrics || '').split('\n').filter(Boolean), [song?.lyrics])
 
   // Warm the catalogue so isFreeThisWeek can compute on a cold deep-link. Never let a
   // stalled catalogue fetch keep the loading gate up forever — proceed after a few
@@ -59,7 +66,7 @@ export default function SingMode() {
   // Paywall: a locked song redirects to the Song page, where the Subscribe CTA lives.
   // Wait for membership to finish loading first — otherwise the cached catalogue makes
   // `locked` compute with a stale isMember=false and bounces real members/admins out.
-  const locked = LOCK_CONTENT && catalogReady && !membershipLoading && !!song && !canAccess(song, isMember)
+  const locked = LOCK_CONTENT && catalogReady && !membershipLoading && !!song && !canAccess(song, isMember, adUnlocked)
   useEffect(() => {
     if (locked) nav(`/song/${id}`, { replace: true })
   }, [locked, id, nav])
@@ -67,9 +74,8 @@ export default function SingMode() {
   // Backing track depends on the view: the Sigidrigi sheet plays the artist's
   // ORIGINAL (reference_url — the guide the band follows); Karaoke plays the
   // karaoke/instrumental track. Each falls back to the other when missing.
-  const activeYtUrl = view === 'sheet'
-    ? (song?.reference_url || song?.instrumental_url)
-    : (song?.instrumental_url || song?.reference_url)
+  const activeYtUrl = backingTrack(song, view)
+  const timingMismatch = !!song?.line_timings?.[0]?.source_url && song.line_timings[0].source_url !== activeYtUrl
   const ytId = getYouTubeId(activeYtUrl)
   const useYouTube = !!ytId && !ytFailed
 
@@ -81,17 +87,25 @@ export default function SingMode() {
   const contentReady = !loading && !(LOCK_CONTENT && (!catalogReady || membershipLoading)) && !locked
 
   useEffect(() => {
+    let cancelled = false
     pushRecent(id)
     async function load() {
+      setError(null)
+      setIsPlaying(false)
+      elapsedRef.current = 0
+      scrollPosRef.current = 0
       const cached = findCachedSong(id)
+      setSong(cached)
+      setLoading(!cached)
       if (cached) { setSong(cached); if (cached.bpm) setBpm(cached.bpm); setLoading(false) }
       const { song } = await loadSong(id)
+      if (cancelled) return
       if (song) { setSong(song); if (song.bpm) setBpm(song.bpm) }
       else if (!cached) setError('Song not found')
       setLoading(false)
     }
     load()
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+    return () => { cancelled = true; if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   }, [id])
 
   // Hidden YouTube instrumental player — created when the song has a valid instrumental_url
@@ -121,7 +135,7 @@ export default function SingMode() {
           onError: () => { setYtFailed(true); setAudioError(!!song?.audio_url === false) },
         },
       })
-    }).catch(() => {})
+    }).catch(() => { if (!cancelled) { setYtFailed(true); setAudioError(!song?.audio_url) } })
     return () => {
       cancelled = true
       // Stop before destroy — destroy alone can leave the media session lingering
@@ -131,7 +145,7 @@ export default function SingMode() {
       ytPlayerRef.current = null
       setYtReady(false)
     }
-  }, [ytId, contentReady])
+  }, [ytId, contentReady, song?.audio_url])
 
   // Pause playback whenever the app/tab goes to the background — a hidden WebView
   // must never keep the instrumental playing behind other apps.
@@ -152,7 +166,7 @@ export default function SingMode() {
     } else {
       audio.pause()
     }
-  }, [isPlaying])
+  }, [isPlaying, useYouTube])
 
   // Sync YouTube player with play/pause
   useEffect(() => {
@@ -176,20 +190,29 @@ export default function SingMode() {
       if (!last) last = ts
       const dt = (ts - last) / 1000
       last = ts
+      elapsedRef.current += dt
 
-      const s = songRef.current
+      const original = songRef.current
+      const differentRecording = original?.line_timings?.[0]?.source_url && original.line_timings[0].source_url !== backingTrack(original, view)
+      const s = differentRecording ? { ...original, line_timings: [], intro: 0, sing_end: 0 } : original
       const introSecs = s?.intro || 0
-      const hasIntro = introSecs > 0
+      const hasIntro = introSecs > 0 || Number(s?.sing_end) > 3
 
       // Time source: YouTube → MP3 → BPM clock
-      let t = 0
+      let t = elapsedRef.current
       let haveAudioTime = false
       if (useYouTube) {
         const p = ytPlayerRef.current
+        t = 0
         if (p && p.getCurrentTime) { try { t = p.getCurrentTime() || 0; haveAudioTime = true } catch { t = 0 } }
       } else {
         const audio = audioRef.current
-        if (audio && !audio.paused) { t = audio.currentTime; haveAudioTime = true }
+        if (audio) { t = audio.currentTime || 0; haveAudioTime = true }
+      }
+      // Never advance lyrics on a wall clock while a real track is loading.
+      if ((useYouTube || s?.audio_url) && !haveAudioTime) {
+        rafRef.current = requestAnimationFrame(step)
+        return
       }
 
       const lineTimings = s?.line_timings
@@ -216,12 +239,19 @@ export default function SingMode() {
 
       // Timed song with no audio: drive the timeline from wall-clock since Play
       if ((hasWindow || hasLineTimings) && !haveAudioTime && playStartRef.current) {
-        t = (Date.now() - playStartRef.current) / 1000
+        t = elapsedRef.current
       }
 
       const el = scrollRef.current
 
-      if (view === 'sheet' && hasWindow && el) {
+      if (hasLineTimings && el) {
+        const activeLine = activeLyricLine(lineTimings, lines, t)
+        const target = el.querySelector(`[data-lyric-line="${activeLine}"]`)
+        const targetScroll = target ? Math.max(0, target.offsetTop - 180) : 0
+        scrollPosRef.current = targetScroll
+        el.scrollTop = targetScroll
+        setCurrentLine(activeLine)
+      } else if (view === 'sheet' && hasWindow && el) {
         // Sigidrigi sheet: scroll the whole sheet proportionally through the window.
         // Uses real scrollHeight, so wrapped lines and natural spacing are fine.
         const frac = Math.min(1, Math.max(0, ((t - winS) * pace) / (winE - winS)))
@@ -241,18 +271,7 @@ export default function SingMode() {
         let line = Math.floor(scrollPosRef.current / lineHeight)
         while (line < lines.length && isHeaderLine(lines[line])) line++
         setCurrentLine(line)
-      } else if (hasLineTimings && t > 0) {
-        // Tap-synced karaoke: the timeline drives currentLine directly
-        let activeLine = 0
-        for (let li = 0; li < lineTimings.length; li++) {
-          if (t >= lineTimings[li].start_time) activeLine = li
-        }
-        // Scroll to keep active line centered
-        const targetScroll = activeLine * lineHeight
-        scrollPosRef.current = targetScroll
-        if (scrollRef.current) scrollRef.current.scrollTop = targetScroll
-        setCurrentLine(activeLine)
-      } else if (t > 0) {
+      } else if (t > 0 && (haveAudioTime || hasIntro)) {
         // Audio-backed: lock to audio time with intro offset
         scrollPosRef.current = Math.max(0, (t - introSecs) * scrollSpeed)
         if (scrollRef.current) {
@@ -261,9 +280,9 @@ export default function SingMode() {
           while (line < lines.length && isHeaderLine(lines[line])) line++
           setCurrentLine(line)
         }
-      } else if (hasIntro) {
+      } else if (hasIntro && !haveAudioTime) {
         // BPM + intro set: use wall-clock elapsed to count down intro then scroll
-        const elapsed = (Date.now() - playStartRef.current) / 1000
+        const elapsed = elapsedRef.current
         scrollPosRef.current = Math.max(0, (elapsed - introSecs) * scrollSpeed)
         if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollPosRef.current
@@ -271,7 +290,7 @@ export default function SingMode() {
           while (line < lines.length && isHeaderLine(lines[line])) line++
           setCurrentLine(line)
         }
-      } else if (scrollStartedRef.current) {
+      } else if (scrollStartedRef.current && !haveAudioTime) {
         // BPM + no intro: accumulate dt only after user taps Start scroll
         scrollPosRef.current += scrollSpeed * dt
         if (scrollRef.current) {
@@ -285,7 +304,7 @@ export default function SingMode() {
     }
     rafRef.current = requestAnimationFrame(step)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [isPlaying, bpm, multiplier, pace, useYouTube, view])
+  }, [isPlaying, bpm, multiplier, pace, useYouTube, view, lines])
 
   // Auto-hide controls when playing, show when paused or tapped
   useEffect(() => {
@@ -331,6 +350,7 @@ export default function SingMode() {
   }
 
   function handleRestart() {
+    elapsedRef.current = 0
     scrollPosRef.current = 0
     setCurrentLine(0)
     playStartRef.current = isPlaying ? Date.now() : null
@@ -355,11 +375,11 @@ export default function SingMode() {
       } catch { /* not ready */ }
     } else if (audioRef.current && audioRef.current.src) {
       audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime + seconds)
-    } else if (playStartRef.current) {
+    } else {
       // BPM-only mode: shifting the start time changes elapsed time
       scrollStartedRef.current = true
       setScrollStarted(true)
-      playStartRef.current -= seconds * 1000
+      elapsedRef.current = Math.max(0, elapsedRef.current + seconds)
     }
   }
 
@@ -367,8 +387,6 @@ export default function SingMode() {
   if (error) return <div style={{ padding: 20, background: '#070707', color: 'var(--danger)', height: '100vh' }}>{error}</div>
   if (!song) return null
 
-  const lines = (song.lyrics || '').split('\n').filter(Boolean)
-  const isHeaderLine = (line) => /^(verse|chorus|bridge|outro|pre-?chorus|intro|hook|\[)/i.test(line.trim())
   const activeAudioUrl = song.audio_url
   const hasAudio = !!activeAudioUrl
 
@@ -383,7 +401,7 @@ export default function SingMode() {
   }
 
   // Measured timing available → Pace fine-tune replaces the BPM guess controls
-  const isMeasured = (song.intro || 0) > 0 &&
+  const isMeasured = ((song.intro || 0) > 0 || Number(song.sing_end) > 3) &&
     ((Number(song.sing_end) || 0) > (song.intro || 0) + 3 || (useYouTube && ytReady))
 
   return (
@@ -391,7 +409,7 @@ export default function SingMode() {
       {/* Hidden audio element — plays MP3 instrumental in sync with scroll (when no YouTube) */}
       {!useYouTube && hasAudio && (
         <audio key={activeAudioUrl} ref={audioRef} src={activeAudioUrl}
-          onError={() => setAudioError(true)} preload="auto" />
+          onEnded={() => setIsPlaying(false)} onError={() => { setAudioError(true); setIsPlaying(false) }} preload="auto" />
       )}
 
       {/* Hidden YouTube instrumental player — off-screen, audio only */}
@@ -463,13 +481,13 @@ export default function SingMode() {
           // wrapping, chorus subtly tinted. The whole sheet scrolls steadily.
           if (view === 'sheet') {
             if (isHeader) return (
-              <p key={i} style={{
+              <p key={i} data-lyric-line={i} style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
                 color: 'rgba(0,229,160,0.6)', margin: '20px 0 8px',
               }}>{line}</p>
             )
             return (
-              <p key={i} className="font-playfair" style={{
+              <p key={i} data-lyric-line={i} className="font-playfair" style={{
                 fontSize: 19, lineHeight: 1.75, marginBottom: 2,
                 color: chorusFlags[i] ? 'rgba(127,240,200,0.95)' : 'rgba(255,255,255,0.92)',
                 fontStyle: chorusFlags[i] ? 'italic' : 'normal',
@@ -478,7 +496,7 @@ export default function SingMode() {
           }
 
           if (isHeader) return (
-            <p key={i} style={{
+            <p key={i} data-lyric-line={i} style={{
               fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
               lineHeight: `${lineHeight}px`, color: 'rgba(255,255,255,0.2)', marginBottom: 0,
             }}>{line}</p>
@@ -487,7 +505,7 @@ export default function SingMode() {
           // Karaoke: line-level highlighting — the active line in big green letters
           // (word-level highlighting removed on purpose — every song renders the same)
           return (
-            <p key={i} className="font-playfair" style={{
+            <p key={i} data-lyric-line={i} className="font-playfair" style={{
               fontSize: isCurrent ? 32 : isNext ? 28 : 24,
               fontWeight: isCurrent ? 700 : 500,
               lineHeight: `${lineHeight}px`,
@@ -561,6 +579,7 @@ export default function SingMode() {
         )}
 
         {/* Audio error */}
+        {timingMismatch && <p style={{ fontSize: 12, color: 'var(--gold)', textAlign: 'center' }}>Saved timing belongs to the other recording. Sync this version for accurate lyrics.</p>}
         {audioError && (
           <p style={{ fontSize: 11, color: 'var(--danger)', textAlign: 'center', marginBottom: 10 }}>Could not load instrumental</p>
         )}
@@ -571,7 +590,7 @@ export default function SingMode() {
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}>
             <SkipBack size={24} />
           </button>
-          <button onClick={() => setIsPlaying(p => !p)}
+          <button aria-label={isPlaying ? 'Pause' : useYouTube && !ytReady ? 'Loading music' : 'Play'} disabled={useYouTube && !ytReady} onClick={() => setIsPlaying(p => !p)}
             style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 28px rgba(0,229,160,0.4)' }}>
             {isPlaying ? <Pause size={26} color="#000" /> : <Play size={26} color="#000" fill="#000" />}
           </button>

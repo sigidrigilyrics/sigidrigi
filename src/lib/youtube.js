@@ -16,13 +16,23 @@ export function loadYouTubeAPI() {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'))
   if (window.YT && window.YT.Player) return Promise.resolve(window.YT)
   if (apiPromise) return apiPromise
-  apiPromise = new Promise((resolve) => {
+  apiPromise = new Promise((resolve, reject) => {
     const prev = window.onYouTubeIframeAPIReady
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof prev === 'function') prev()
-      resolve(window.YT)
-    }
     const tag = document.createElement('script')
+    const fail = () => {
+      clearTimeout(timeout)
+      tag.remove()
+      window.onYouTubeIframeAPIReady = prev
+      apiPromise = null
+      reject(new Error('Music could not load. Check your connection and try again.'))
+    }
+    const timeout = setTimeout(fail, 12000)
+    window.onYouTubeIframeAPIReady = () => {
+      clearTimeout(timeout)
+      resolve(window.YT)
+      if (typeof prev === 'function') prev()
+    }
+    tag.onerror = fail
     tag.src = 'https://www.youtube.com/iframe_api'
     document.body.appendChild(tag)
   })

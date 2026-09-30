@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { Innertube } from 'youtubei.js'
+import { requireEditor, setCors } from './_auth.js'
 
 export const maxDuration = 120
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
@@ -30,11 +31,10 @@ async function downloadFromYoutube(videoId) {
 
 export default async function handler(req, res) {
   // Allow the native app (served from https://localhost) to call this cross-origin.
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  setCors(res, req)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).end()
+  if (!await requireEditor(req)) return res.status(401).json({ error: 'Editor access required' })
 
   const { youtubeUrl, audioBase64, audioMimeType, lyrics } = req.body
   if (!lyrics) return res.status(400).json({ error: 'Missing lyrics' })

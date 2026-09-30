@@ -1,16 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom'
 import { App as CapApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { supabase } from './lib/supabase'
+import { configureNativeRewardedAds } from './lib/nativeAdMob'
 import Home from './pages/Home'
 import Song from './pages/Song'
 import SingMode from './pages/SingMode'
 import AZIndex from './pages/AZIndex'
-import Upload from './pages/Upload'
-import Admin from './pages/Admin'
-import LyricSync from './pages/LyricSync'
-import TapSync from './pages/TapSync'
+import LoadingScreen from './components/LoadingScreen'
 import Artists from './pages/Artists'
 import Account from './pages/Account'
 import Welcome from './pages/Welcome'
@@ -19,9 +17,16 @@ import Browse from './pages/Browse'
 import Favorites from './pages/Favorites'
 import BottomTabBar from './components/BottomTabBar'
 
+const Upload = lazy(() => import('./pages/Upload'))
+const Admin = lazy(() => import('./pages/Admin'))
+const LyricSync = lazy(() => import('./pages/LyricSync'))
+const TapSync = lazy(() => import('./pages/TapSync'))
+
 // A login-callback URL can arrive via appUrlOpen AND as the cold-start launch
 // URL; the auth code is single-use, so make sure each URL is handled once.
 const handledLoginUrls = new Set()
+
+configureNativeRewardedAds()
 
 function NotFound() {
   return (
@@ -120,7 +125,7 @@ function Layout() {
   }, [nav])
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', maxWidth, margin: '0 auto' }}>
-      <Routes>
+      <Suspense fallback={<LoadingScreen onBack={() => nav(-1)} />}><Routes>
         <Route path="/" element={<Home />} />
         <Route path="/song/:id" element={<Song />} />
         <Route path="/sing/:id" element={<SingMode />} />
@@ -138,7 +143,7 @@ function Layout() {
         <Route path="/privacy" element={<Legal type="privacy" />} />
         <Route path="/copyright" element={<Legal type="copyright" />} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
+      </Routes></Suspense>
       {!hideNav && <BottomTabBar />}
     </div>
   )
